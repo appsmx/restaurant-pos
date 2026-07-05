@@ -1,0 +1,75 @@
+import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
+
+export const orderService = {
+  createOrder: async (userId: string, tableId?: string, type: string = 'DINE_IN') => {
+    const order = await prisma.order.create({
+      data: {
+        userId,
+        tableId: tableId || null,
+        type: type as any,
+        status: 'OPEN',
+      },
+      include: { items: true }
+    });
+
+    if (tableId) {
+      await prisma.table.update({
+        where: { id: tableId },
+        data: { status: 'OCCUPIED' }
+      });
+    }
+
+    return order;
+  },
+
+  addOrderItem: async (orderId: string, productId: string, quantity: number, notes?: string) => {
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new AppError('Producto no encontrado', 404);
+
+    const orderItem = await prisma.orderItem.create({
+      data: {
+        orderId,
+        productId,
+        quantity,
+        unitPrice: product.price,
+        notes: notes || null,
+        status: 'PENDING'
+      }
+    });
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { total: { increment: product.price * quantity } }
+    });
+
+    return orderItem;
+  },
+
+  sendToKitchen: async (orderId: string) => {
+    await prisma.orderItem.updateMany({
+      where: { orderId, status: 'PENDING' },
+      data: { status: 'SENT' }
+    });
+
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'SENT' },
+      include: { items: true }
+    });
+  },
+
+  getActiveOrders: async () => {
+    return prisma.order.findMany({
+      where: {
+        status: { in: ['OPEN', 'SENT', 'PREPARING', 'READY'] }
+      },
+      include: {
+        items: { include: { product: true } },
+        table: true,
+        user: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+};

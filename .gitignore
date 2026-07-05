@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+
+# Environment
+.env
+*.env
+
+# Prisma
+packages/api/prisma/migrations/
+
+# System
+.DS_Store
+Thumbs.db
+# Basura de rutas largas
+packages/api/prisma/packages/
+packages/shared/packages/
+packages/shared/dist/
+packages/shared/src/packages/
+apps/web/src/lib/apps/
+apps/web/src/stores/apps/

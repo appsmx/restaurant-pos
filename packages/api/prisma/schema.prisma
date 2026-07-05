@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  name      String
+  role      Role     @default(WAITER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions    Session[]
+  orders      Order[]
+  payments    Payment[]
+  stockMoves  StockMovement[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  locked    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  WAITER
+  CASHIER
+  CHEF
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String
+  sort     Int       @default(0)
+  active   Boolean   @default(true)
+  products Product[]
+}
+
+model Product {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  categoryId  String
+  type        ProductType    @default(STANDARD)
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  category      Category       @relation(fields: [categoryId], references: [id])
+  modifiers     ModifierItem[]
+  orderItems    OrderItem[]
+  ingredients   RecipeIngredient[]
+}
+
+enum ProductType {
+  STANDARD
+  COMBO
+  MODIFIER
+}
+
+model ModifierGroup {
+  id          String         @id @default(uuid())
+  name        String
+  required    Boolean        @default(false)
+  minSelect   Int            @default(0)
+  maxSelect   Int            @default(1)
+  modifiers   ModifierItem[]
+}
+
+model ModifierItem {
+  id           String        @id @default(uuid())
+  name         String
+  price        Float         @default(0)
+  groupId      String
+  products     Product[]
+
+  group        ModifierGroup @relation(fields: [groupId], references: [id])
+}
+
+model Section {
+  id    String @id @default(uuid())
+  name  String
+  sort  Int    @default(0)
+  tables Table[]
+}
+
+model Table {
+  id         String     @id @default(uuid())
+  name       String
+  sectionId  String
+  capacity   Int        @default(4)
+  status     TableStatus @default(AVAILABLE)
+  shape      String     @default("SQUARE")
+  posX       Float      @default(0)
+  posY       Float      @default(0)
+
+  section    Section    @relation(fields: [sectionId], references: [id])
+  orders     Order[]
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  DIRTY
+  OUT_OF_SERVICE
+}
+
+model Order {
+  id        String       @id @default(uuid())
+  tableId   String?
+  type      OrderType    @default(DINE_IN)
+  status    OrderStatus  @default(OPEN)
+  total     Float        @default(0)
+  userId    String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  closedAt  DateTime?
+
+  table   Table?    @relation(fields: [tableId], references: [id])
+  user    User      @relation(fields: [userId], references: [id])
+  items   OrderItem[]
+  payments Payment[]
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderStatus {
+  OPEN
+  SENT
+  PREPARING
+  READY
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+model OrderItem {
+  id           String             @id @default(uuid())
+  orderId      String
+  productId    String
+  quantity     Int                @default(1)
+  unitPrice    Float
+  notes        String?
+  status       OrderItemStatus    @default(PENDING)
+
+  order        Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product            @relation(fields: [productId], references: [id])
+  modifiers    OrderItemModifier[]
+}
+
+enum OrderItemStatus {
+  PENDING
+  SENT
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItemModifier {
+  id            String       @id @default(uuid())
+  orderItemId   String
+  modifierId    String
+  quantity      Int          @default(1)
+
+  orderItem     OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id        String       @id @default(uuid())
+  orderId   String
+  amount    Float
+  method    PaymentMethod
+  status    PaymentStatus @default(COMPLETED)
+  userId    String
+  createdAt DateTime     @default(now())
+
+  order     Order        @relation(fields: [orderId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Ingredient {
+  id       String             @id @default(uuid())
+  name     String
+  stock    Float              @default(0)
+  unit     String             @default("UNIT")
+  recipes  RecipeIngredient[]
+  movements StockMovement[]
+}
+
+model RecipeIngredient {
+  id           String    @id @default(uuid())
+  productId    String
+  ingredientId String
+  quantity     Float
+
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+}
+
+model StockMovement {
+  id           String       @id @default(uuid())
+  ingredientId String
+  type         MovementType
+  quantity     Float
+  reason       String?
+  userId       String
+  createdAt    DateTime     @default(now())
+
+  ingredient   Ingredient   @relation(fields: [ingredientId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  WASTE
+}
+
+model SyncQueue {
+  id        String   @id @default(uuid())
+  entity    String
+  entityId  String
+  action    String
+  payload   Json
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+}
