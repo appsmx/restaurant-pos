@@ -7,7 +7,7 @@ export const apiClient = async (endpoint: string, method: string = 'GET', body: 
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': Bearer  + token } : {})
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     }
   };
 

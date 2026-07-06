@@ -1,35 +1,19 @@
-import { Router } from 'express';
-import { menuService } from '../services/menuService';
-import { auth } from '../middleware/auth';
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
 
-const router = Router();
-router.use(auth);
+const router = express.Router();
+const prisma = new PrismaClient();
 
-router.get('/categories', async (req, res, next) => {
+router.get('/categories', async (req, res) => {
   try {
-    const categories = await menuService.getCategories();
+    const categories = await prisma.category.findMany({
+      include: {
+        products: true,
+      },
+    });
     res.json(categories);
   } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/products', async (req, res, next) => {
-  try {
-    const { categoryId } = req.query;
-    const products = await menuService.getProducts(categoryId as string | undefined);
-    res.json(products);
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/products', async (req, res, next) => {
-  try {
-    const product = await menuService.createProduct(req.body);
-    res.status(201).json(product);
-  } catch (error) {
-    next(error);
+    res.status(500).json({ error: 'Error al obtener las categorías' });
   }
 });
 

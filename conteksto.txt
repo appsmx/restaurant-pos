@@ -1,5 +1,5 @@
 📍 Contexto POS Restaurante — Estado Real
-(Se actualiza cada 5 cambios o cuando hay un bloqueo crítico para que cualquier IA nueva entienda el proyecto)
+(Se actualiza cada 5 cambios o bloqueos críticos para que cualquier IA nueva entienda el proyecto)
 
 QUÉ ES ESTO
 Sistema de Punto de Venta (POS) para restaurantes, construido desde cero con React + Express + PostgreSQL + Prisma. Nombre pendiente.
@@ -18,28 +18,32 @@ Floor Plan (Mesas): Secciones, Mesas, Cambio de estado.
 Órdenes: Crear orden, agregar items, enviar a cocina.
 ✅ FRONTEND (BASE + UI VISUAL):
 Instalado zustand para manejo de estado.
-Creado lib/apiClient.ts para conectar con backend.
+apiClient.ts CORREGIDO: Sintaxis de Authorization: Bearer ${token} arreglada.
 Creado stores/authStore.ts para login real.
-VITE CONECTANDO CORRECTAMENTE en http://localhost:5173.
+VITE CONECTANDO CORRECTAMENTE: Configurado con host: 'localhost' en vite.config.ts.
 Login funcional (pages/Login.tsx).
 Layout del POS creado (components/POSLayout.tsx y Sidebar.tsx).
-Páginas placeholder creadas: FloorPlan.tsx, MenuBrowser.tsx, OrderPanel.tsx (sin conectar al backend aún).
-✅ GIT: Proyecto inicializado. Repo remoto creado en GitHub (appsmx/restaurant-pos). PERO NO SE HA PODIDO SUBIR NADA TODAVÍA.
-EL PROBLEMA ACTUAL (BLOQUEO CRÍTICO)
-Git no puede hacer el primer commit/push.
-Hay carpetas "basura" corruptas anidadas dentro del proyecto (ej: packages/shared/src/packages/api/src/routes/...) que se generaron por error en sesiones pasadas. Los paths superan los 260 caracteres.
+FloorPlan 100% FUNCIONAL: Conectado al backend (GET /floorplan/sections). Muestra mesas por sección con colores según estado.
+Páginas placeholder creadas: MenuBrowser.tsx, OrderPanel.tsx (sin conectar al backend aún).
+✅ GIT/GITHUB: Repo subido correctamente (appsmx/restaurant-pos).
+EL PROBLEMA ACTUAL (BLOQUEO ACTUAL)
+Fallo al intentar configurar un Agente de IA gratuito (Roo Code o Cline) usando la API de Groq para automatizar la escritura de código.
 
-Windows no puede borrarlas con rmdir normal.
-Git hace git add . pero falla con error: unable to index file... Filename too long.
-Intento de fix actual: Se agregaron esas rutas al .gitignore para que Git las ignore, pero falta verificar si esto permite hacer el commit finalmente.
+Se configuró Roo Code con el proveedor "OpenAI Compatible" apuntando a Groq.
+El agente se queda en estado "cargando infinito" sin dar error ni respuesta.
+Se intentó probar la clave de Groq mediante curl en la terminal de Windows PowerShell, pero falló porque PowerShell convierte curl en Invoke-WebRequest y la sintaxis no es compatible.
+⚠️ ALERTA DE SEGURIDAD: Una API Key de Groq fue expuesta accidentalmente en el chat. HAY QUE REVOCARLA INMEDIATAMENTE en https://console.groq.com/keys y generar una nueva antes de continuar.
 LO QUE HAY QUE HACER (en orden)
-Inmediato (Git):
+Inmediato (Seguridad y Agente):
 
-Verificar si el .gitignore actual burla a Git y permite ejecutar git add ., git commit y git push -u origin main.
-Si sigue fallando, la alternativa nuclear es habilitar LongPathsEnabled en el registro de Windows (requiere reiniciar PC) o usar una herramienta como LongPathTool para borrar las carpetas corruptas.
-Después (Frontend UI): Conectar los placeholders con el backend real (Traer mesas, traer menú, ver órdenes).
+Revocar la API Key de Groq expuesta y crear una nueva.
+Probar conectar el agente (preferentemente Cline, ya que tiene a Groq de forma nativa en lugar de "OpenAI Compatible") con la nueva clave.
+Si el agente sigue sin conectar, revisar el Firewall de Windows Saliente o probar desde otra red.
+Después (Frontend UI):
+Conectar MenuBrowser.tsx al backend.
+Conectar OrderPanel.tsx al backend.
 Después (Backend extra): Módulo de Pagos y Inventario.
-Después (Deploy): Terminar de subir a GitHub, Vercel/Render.
+Después (Deploy): Vercel/Render.
 ARCHIVOS DEL PROYECTO
 text
 
@@ -53,24 +57,28 @@ C:\Users\juliq\Desktop\restaurant-pos
 └── apps/web/
     ├── src/
 │   ├── main.tsx ✅
-│   ├── App.tsx ✅ (Maneja Login vs POSLayout)
+│   ├── App.tsx ✅
 │   ├── components/
 │   │   ├── POSLayout.tsx ✅
 │   │   └── Sidebar.tsx ✅
 │   ├── pages/
 │   │   ├── Login.tsx ✅
-│   │   ├── FloorPlan.tsx ✅ (Placeholder)
+│   │   ├── FloorPlan.tsx ✅ (CONECTADO Y FUNCIONAL)
 │   │   ├── MenuBrowser.tsx ✅ (Placeholder)
 │   │   └── OrderPanel.tsx ✅ (Placeholder)
 │   ├── stores/authStore.ts ✅
 │   ├── lib/apiClient.ts ✅
 │   └── styles/globals.css ✅
 └── (configs de vite, tailwind, tsconfig) ✅
-Nota: Existen carpetas basura ocultas que no deben tocarse hasta resolver el tema de Git.
-
 DETALLES TÉCNICOS CLAVE
-vite.config.ts: DEBE usar host: 'localhost'. Si se usa '0.0.0.0', Windows Firewall bloquea la conexión y da ERR_CONNECTION_REFUSED.
-conteksto.txt: Archivo del usuario en la raíz. NO BORRAR.
-.gitignore: Contiene reglas añadidas recientemente para ignorar packages/api/prisma/packages/, packages/shared/packages/, etc.
+vite.config.ts: DEBE usar host: 'localhost'.
+apiClient.ts: DEBE usar template literals: `Bearer ${token}`.
+RUTAS DEL BACKEND: /floorplan (SIN guión), /menu, /orders, /auth.
+CONFIGURACIÓN DEL AGENTE (Groq):
+Proveedor en Cline: "Groq" (Nativo).
+Proveedor en Roo: "OpenAI Compatible".
+Base URL: https://api.groq.com/openai/v1
+Model ID: llama-3.3-70b-versatile
+POWERHELL: El comando curl no funciona igual que en Linux. Usa Invoke-WebRequest por debajo y la sintaxis -H falla.
 CREDENCIALES DE PRUEBA
 Usuario: admin / Contraseña: Admin1234 / Rol: Admin

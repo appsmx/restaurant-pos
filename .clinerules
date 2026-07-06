@@ -1,0 +1,4 @@
+Nunca leas la carpeta node_modules.
+Nunca leas la carpeta dist.
+Nunca leas archivos de configuración como pnpm-lock.yaml o turbo.json.
+Solo lee los archivos que el usuario te pida explícitamente.
