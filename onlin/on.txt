@@ -1,0 +1,2 @@
+pnpm -F @pos/web dev: La "D" es de Development (Desarrollo). Esto enciende un servidor de prueba adentro de tu computadora. Si cerrás la terminal, la página se apaga. Solo vos podés verla en localhost:5173.
+pnpm -F @pos/api dev: Igual, un servidor de prueba en tu PC en el puerto 3001.
