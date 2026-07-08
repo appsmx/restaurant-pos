@@ -45,4 +45,15 @@ router.get('/active', async (req, res, next) => {
   }
 });
 
+// --- ESTA ES LA RUTA NUEVA ---
+router.patch('/:id/pay', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await orderService.closeOrder(id);
+    res.json(order);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

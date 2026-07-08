@@ -71,5 +71,28 @@ export const orderService = {
       },
       orderBy: { createdAt: 'desc' }
     });
+  },
+
+  // --- ESTA ES LA NUEVA ---
+  closeOrder: async (orderId: string) => {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new AppError('Orden no encontrada', 404);
+
+    // 1. Cambiar estado a PAGADA
+    const closedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'PAID' },
+      include: { items: true, table: true }
+    });
+
+    // 2. Si tenía mesa, liberarla (ponerla en AVAILABLE)
+    if (order.tableId) {
+      await prisma.table.update({
+        where: { id: order.tableId },
+        data: { status: 'AVAILABLE' }
+      });
+    }
+
+    return closedOrder;
   }
 };
