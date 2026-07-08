@@ -1,4 +1,5 @@
 📍 Contexto POS Restaurante — Estado Real
+(Contexto actualizado final de la sesión. El POS ya es un prototipo funcional).
 
 QUÉ ES ESTO
 Sistema de Punto de Venta (POS) para restaurantes, construido desde cero con React + Express + PostgreSQL + Prisma. Nombre pendiente.
@@ -15,26 +16,26 @@ Auth: Login, Logout, Middleware de seguridad.
 Menú: Categorías y Productos.
 Floor Plan (Mesas): Secciones, Mesas, Cambio de estado.
 Órdenes: Crear orden, agregar items, enviar a cocina.
-✅ FRONTEND COMPLETO (BASE VISUAL):
-Instalado zustand para manejo de estado.
-apiClient.ts CORREGIDO.
-VITE CONECTANDO CORRECTAMENTE: Configurado con host: 'localhost'.
+✅ FRONTEND COMPLETO (PROTOTIPO FUNCIONAL):
 Login funcional (pages/Login.tsx).
-Layout del POS creado (components/POSLayout.tsx y Sidebar.tsx).
-FloorPlan 100% FUNCIONAL: Conectado a GET /floorplan/sections. Muestra mesas por sección con colores.
-MenuBrowser 100% FUNCIONAL: Conectado a GET /menu/categories. Muestra sidebar de categorías y grid de productos.
-OrderPanel 100% FUNCIONAL: Conectado a GET /orders/active. Muestra tarjetas de órdenes con colores según estado. Se refresca cada 30 segundos.
-✅ GIT/GITHUB: Repo subido y actualizado con los últimos cambios (FloorPlan y MenuBrowser).
+Layout del POS (components/POSLayout.tsx y Sidebar.tsx).
+FloorPlan FUNCIONAL: Muestra mesas por sección, clic cambia el estado.
+MenuBrowser FUNCIONAL: Muestra categorías y productos.
+Carrito (Zustand): Creado stores/orderStore.ts. Al hacer clic en un producto, se agrega al carrito visual con botones +/- y total.
+Envío a Cocina FUNCIONAL: El botón "Enviar a Cocina" hace POST /orders, POST /orders/:id/items y PATCH /orders/:id/send.
+OrderPanel FUNCIONAL: Muestra las órdenes activas en tiempo real (se actualiza cada 30 segundos).
+✅ GIT/GITHUB: Repo subido y actualizado con todos los cambios de la sesión.
 EL PROBLEMA ACTUAL
-Ninguno a nivel de código. El sistema es estable. (Nota de entorno: Se intentó configurar agentes de IA gratuitos como Cline+Groq y Cline+Gemini 2.5 Flash para automatizar código, pero fallaron por límites de tokens de Groq y errores 404 en la API de Google. Quedó pendiente resolver la configuración de Cline con Gemini en el futuro).
+Ninguno a nivel de código. El flujo básico funciona (Mesas -> Menú -> Carrito -> Cocina -> Vista de Órdenes).
 
 LO QUE HAY QUE HACER (en orden)
-Inmediato (Lógica de negocio Frontend):
+Próximo paso (Lógica de negocio):
 
-Hacer que al hacer clic en un producto del MenuBrowser, este se agregue a una orden activa (usando POST /orders y POST /orders/:id/items).
-Poder enviar la orden a cocina (PATCH /orders/:id/send) desde el OrderPanel.
-Después (Backend extra): Módulo de Pagos y Cerrar cuenta.
+Implementar selección de mesa al crear una orden (conectar el FloorPlan con el Menú/Carrito).
+Módulo de Pagos (Cerrar cuenta, dividir cuenta).
+Después (Backend extra): Módulo de Inventario.
 Después (Deploy): Neon (DB) + Render (API) + Vercel (Web).
+Técnico pendiente: Configurar agente de IA gratuito (Cline + Gemini 2.5 Flash) para automatizar tareas.
 ARCHIVOS DEL PROYECTO
 text
 
@@ -55,15 +56,18 @@ C:\Users\juliq\Desktop\restaurant-pos
 │   ├── pages/
 │   │   ├── Login.tsx ✅
 │   │   ├── FloorPlan.tsx ✅ (CONECTADO)
-│   │   ├── MenuBrowser.tsx ✅ (CONECTADO)
+│   │   ├── MenuBrowser.tsx ✅ (CONECTADO + CARRITO)
 │   │   └── OrderPanel.tsx ✅ (CONECTADO)
-│   ├── stores/authStore.ts ✅
+│   ├── stores/
+│   │   ├── authStore.ts ✅
+│   │   └── orderStore.ts ✅ (NUEVO: Maneja el carrito)
 │   ├── lib/apiClient.ts ✅
 │   └── styles/globals.css ✅
 └── (configs de vite, tailwind, tsconfig) ✅
 DETALLES TÉCNICOS CLAVE
 EJECUCIÓN: Se requieren 2 terminales: 1) pnpm -F @pos/api dev 2) pnpm -F @pos/web dev.
 RUTAS DEL BACKEND: /floorplan, /menu, /orders, /auth (SIN guiones).
-COMANDOS dev vs build: dev corre en localhost solo para el programador. Para publicar en internet se usa build (frontend) y plataformas como Vercel/Render.
+JWT Y REINICIOS: Si se reinicia el backend sin un JWT_SECRET fijo en un archivo .env, el token anterior expira y hay que hacer Logout/Login de nuevo.
+FLUJO DEL CARRITO: El carrito vive en la memoria de Zustand. Si recargas la página, se pierde (es el comportamiento correcto para un ticket temporal).
 CREDENCIALES DE PRUEBA
 Usuario: admin / Contraseña: Admin1234 / Rol: Admin

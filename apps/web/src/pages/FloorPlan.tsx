@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
+import { useOrderStore } from '../stores/orderStore';
 
 interface Table {
   id: string;
@@ -25,10 +26,15 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; border: string;
 
 const STATUS_CYCLE = ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'DIRTY', 'OUT_OF_SERVICE'];
 
-export default function FloorPlan() {
+interface FloorPlanProps {
+  onViewChange: (view: 'floorplan' | 'menu' | 'orders') => void;
+}
+
+export default function FloorPlan({ onViewChange }: FloorPlanProps) {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const setSelectedTable = useOrderStore((s) => s.setSelectedTable);
 
   const fetchSections = async () => {
     try {
@@ -46,68 +52,50 @@ export default function FloorPlan() {
     fetchSections();
   }, []);
 
-  const handleStatusChange = async (tableId: string, currentStatus: string) => {
-    const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
-    const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-
-    try {
-      await apiClient(`/floorplan/tables/${tableId}/status`, 'PATCH', { status: nextStatus });
-      fetchSections();
-    } catch (err) {
-      setError('Error al cambiar estado');
+  const handleTableClick = async (table: Table) => {
+    if (table.status === 'AVAILABLE') {
+      // Si está disponible, la selecciona y manda al menú
+      setSelectedTable({ id: table.id, name: table.name });
+      onViewChange('menu');
+    } else {
+      // Si no, ejecuta el ciclo de estados normal
+      const currentIndex = STATUS_CYCLE.indexOf(table.status);
+      const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
+      try {
+        await apiClient(`/floorplan/tables/${table.id}/status`, 'PATCH', { status: nextStatus });
+        fetchSections();
+      } catch (err) {
+        setError('Error al cambiar estado');
+      }
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-400 text-lg">Cargando mesas...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-red-400 text-lg">{error}</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-64"><p className="text-gray-400 text-lg">Cargando mesas...</p></div>;
+  if (error) return <div className="flex items-center justify-center h-64"><p className="text-red-400 text-lg">{error}</p></div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Mesas</h1>
-        <div className="flex gap-4 text-sm">
-          {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded-sm ${config.bg}`}></div>
-              <span className="text-gray-400">{config.label}</span>
-            </div>
-          ))}
-        </div>
+        <p className="text-gray-500 text-sm">Clic en una mesa <span className="text-emerald-400">Disponible</span> para tomar un pedido</p>
       </div>
 
       {sections.length === 0 ? (
-        <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400">
-          <p>No hay secciones configuradas</p>
-        </div>
+        <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400"><p>No hay secciones configuradas</p></div>
       ) : (
         <div className="space-y-8">
           {sections.map((section) => (
             <div key={section.id}>
-              <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-800 pb-2">
-                {section.name}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-800 pb-2">{section.name}</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {section.tables.map((table) => {
                   const config = STATUS_CONFIG[table.status] || STATUS_CONFIG.AVAILABLE;
                   return (
                     <button
                       key={table.id}
-                      onClick={() => handleStatusChange(table.id, table.status)}
+                      onClick={() => handleTableClick(table)}
                       className={`${config.bg} ${config.border} border-2 rounded-lg p-4 flex flex-col items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer`}
-                      title={`Clic para cambiar estado`}
+                      title={table.status === 'AVAILABLE' ? 'Clic para tomar pedido' : 'Clic para cambiar estado'}
                     >
                       <span className="text-white font-bold text-lg">{table.name}</span>
                       <span className="text-white/70 text-xs">{table.capacity} personas</span>

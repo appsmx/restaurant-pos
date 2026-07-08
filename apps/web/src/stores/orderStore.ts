@@ -7,8 +7,15 @@ interface CartItem {
   quantity: number;
 }
 
+interface TableInfo {
+  id: string;
+  name: string;
+}
+
 interface OrderState {
   items: CartItem[];
+  selectedTable: TableInfo | null;
+  setSelectedTable: (table: TableInfo | null) => void;
   addItem: (product: { id: string; name: string; price: number }) => void;
   removeItem: (productId: string) => void;
   clearCart: () => void;
@@ -17,6 +24,8 @@ interface OrderState {
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   items: [],
+  selectedTable: null,
+  setSelectedTable: (table) => set({ selectedTable: table }),
   addItem: (product) => set((state) => {
     const existing = state.items.find((i) => i.id === product.id);
     if (existing) {
@@ -33,6 +42,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       .map((i) => (i.id === productId ? { ...i, quantity: i.quantity - 1 } : i))
       .filter((i) => i.quantity > 0),
   })),
-  clearCart: () => set({ items: [] }),
+  clearCart: () => set({ items: [], selectedTable: null }),
   getTotal: () => get().items.reduce((sum, item) => sum + item.price * item.quantity, 0),
 }));

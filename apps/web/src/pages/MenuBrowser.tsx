@@ -22,8 +22,8 @@ export default function MenuBrowser() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  // Carrito (Zustand)
-  const { items, addItem, removeItem, clearCart, getTotal } = useOrderStore();
+  // Carrito y Mesa seleccionada (Zustand)
+  const { items, addItem, removeItem, clearCart, getTotal, selectedTable } = useOrderStore();
 
   const fetchMenu = async () => {
     try {
@@ -46,8 +46,11 @@ export default function MenuBrowser() {
     if (items.length === 0) return;
     setSending(true);
     try {
-      // 1. Crear la orden en el backend
-      const order = await apiClient('/orders', 'POST', { type: 'DINE_IN' });
+      // 1. Crear la orden pasándole la mesa seleccionada
+      const order = await apiClient('/orders', 'POST', { 
+        type: 'DINE_IN',
+        tableId: selectedTable?.id || null 
+      });
       
       // 2. Agregar cada item del carrito a la orden
       for (const item of items) {
@@ -60,7 +63,7 @@ export default function MenuBrowser() {
       // 3. Enviar a cocina
       await apiClient(`/orders/${order.id}/send`, 'PATCH');
 
-      // 4. Limpiar carrito local
+      // 4. Limpiar carrito y mesa
       clearCart();
       alert('¡Orden enviada a cocina correctamente!');
     } catch (err) {
@@ -97,7 +100,7 @@ export default function MenuBrowser() {
       </div>
 
       {/* Grid de productos */}
-      <div className="flex-1 overflow-auto pb-24"> {/* pb-24 para que no tape el carrito flotante */}
+      <div className="flex-1 overflow-auto pb-24">
         {selectedCategory ? (
           <>
             <h1 className="text-2xl font-bold mb-6">{selectedCategory.name}</h1>
@@ -139,7 +142,10 @@ export default function MenuBrowser() {
       {/* Carrito Flotante */}
       {items.length > 0 && (
         <div className="absolute bottom-4 right-4 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4">
-          <h3 className="text-white font-bold mb-3 border-b border-gray-800 pb-2">Ticket Actual</h3>
+          <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+            <h3 className="text-white font-bold">Ticket Actual</h3>
+            {selectedTable && <span className="text-blue-400 text-sm font-semibold">Mesa: {selectedTable.name}</span>}
+          </div>
           <div className="space-y-2 max-h-40 overflow-auto mb-3">
             {items.map((item) => (
               <div key={item.id} className="flex justify-between text-sm items-center">

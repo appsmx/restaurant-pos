@@ -11,7 +11,7 @@ export default function POSLayout() {
 
   const renderView = () => {
     switch (activeView) {
-      case 'floorplan': return <FloorPlan />;
+      case 'floorplan': return <FloorPlan onViewChange={setActiveView} />;
       case 'menu': return <MenuBrowser />;
       case 'orders': return <OrderPanel />;
     }
