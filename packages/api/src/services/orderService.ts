@@ -81,7 +81,7 @@ export const orderService = {
     // 1. Cambiar estado a PAGADA
     const closedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status: 'PAID' },
+      data: { status: 'CLOSED' },
       include: { items: true, table: true }
     });
 
