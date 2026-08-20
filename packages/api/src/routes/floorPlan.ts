@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { floorPlanService } from '../services/floorPlanService';
 import { auth } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { updateTableStatusSchema } from '../lib/validators';
 
 const router = Router();
 router.use(auth);
@@ -24,7 +26,7 @@ router.get('/tables', async (req, res, next) => {
   }
 });
 
-router.patch('/tables/:id/status', async (req, res, next) => {
+router.patch('/tables/:id/status', validate(updateTableStatusSchema), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;

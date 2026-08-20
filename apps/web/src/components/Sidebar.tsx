@@ -10,7 +10,7 @@ interface SidebarProps {
 const menuItems: { view: View; label: string; icon: string }[] = [
   { view: 'floorplan', label: 'Mesas', icon: '🏗️' },
   { view: 'menu', label: 'Menú', icon: '📋' },
-  { view: 'orders', label: 'Órdenes', icon: '兴隆' },
+  { view: 'orders', label: 'Órdenes', icon: '🧾' },
 ];
 
 export default function Sidebar({ activeView, onViewChange }: SidebarProps) {

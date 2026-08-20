@@ -57,8 +57,8 @@ export default function OrderPanel() {
     
     setPayingId(orderId);
     try {
-      await apiClient(`/orders/${orderId}/pay`, 'PATCH');
-      // Al pagar, la orden pasa a PAID y desaparece de las activas. Refrescamos.
+      await apiClient(`/orders/${orderId}/pay`, 'PATCH', { method: 'CASH' });
+      // Al pagar, la orden pasa a CLOSED y desaparece de las activas. Refrescamos.
       fetchOrders();
     } catch (err) {
       alert('Error al procesar el pago');
@@ -81,7 +81,7 @@ export default function OrderPanel() {
 
       {orders.length === 0 ? (
         <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400">
-          <p className="text-4xl mb-2">兴隆</p>
+          <p className="text-4xl mb-2">🧾</p>
           <p>No hay órdenes activas actualmente</p>
         </div>
       ) : (

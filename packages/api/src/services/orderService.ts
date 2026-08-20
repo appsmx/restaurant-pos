@@ -74,18 +74,30 @@ export const orderService = {
   },
 
   // --- ESTA ES LA NUEVA ---
-  closeOrder: async (orderId: string) => {
+  closeOrder: async (orderId: string, userId: string, method: string = 'CASH') => {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new AppError('Orden no encontrada', 404);
+    if (order.status === 'CLOSED') throw new AppError('La orden ya está cerrada', 400);
 
-    // 1. Cambiar estado a PAGADA
-    const closedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'CLOSED' },
-      include: { items: true, table: true }
+    // 1. Crear el registro de pago
+    await prisma.payment.create({
+      data: {
+        orderId,
+        amount: order.total,
+        method: method as any,
+        status: 'COMPLETED',
+        userId,
+      },
     });
 
-    // 2. Si tenía mesa, liberarla (ponerla en AVAILABLE)
+    // 2. Cambiar estado a CLOSED y registrar timestamp
+    const closedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'CLOSED', closedAt: new Date() },
+      include: { items: true, table: true, payments: true }
+    });
+
+    // 3. Si tenía mesa, liberarla (ponerla en AVAILABLE)
     if (order.tableId) {
       await prisma.table.update({
         where: { id: order.tableId },
