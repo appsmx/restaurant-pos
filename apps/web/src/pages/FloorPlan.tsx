@@ -26,8 +26,10 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; border: string;
 
 const STATUS_CYCLE = ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'DIRTY', 'OUT_OF_SERVICE'];
 
+import { View } from '../components/POSLayout';
+
 interface FloorPlanProps {
-  onViewChange: (view: 'floorplan' | 'menu' | 'orders') => void;
+  onViewChange: (view: View) => void;
 }
 
 export default function FloorPlan({ onViewChange }: FloorPlanProps) {
@@ -75,31 +77,31 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Mesas</h1>
-        <p className="text-gray-500 text-sm">Clic en una mesa <span className="text-emerald-400">Disponible</span> para tomar un pedido</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-2">
+        <h1 className="text-xl md:text-2xl font-bold">Mesas</h1>
+        <p className="text-gray-500 text-xs md:text-sm">Toca una mesa <span className="text-emerald-400">Disponible</span> para tomar pedido</p>
       </div>
 
       {sections.length === 0 ? (
         <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400"><p>No hay secciones configuradas</p></div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6 md:space-y-8">
           {sections.map((section) => (
             <div key={section.id}>
-              <h2 className="text-lg font-semibold text-gray-300 mb-3 border-b border-gray-800 pb-2">{section.name}</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <h2 className="text-base md:text-lg font-semibold text-gray-300 mb-2 md:mb-3 border-b border-gray-800 pb-2">{section.name}</h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-3">
                 {section.tables.map((table) => {
                   const config = STATUS_CONFIG[table.status] || STATUS_CONFIG.AVAILABLE;
                   return (
                     <button
                       key={table.id}
                       onClick={() => handleTableClick(table)}
-                      className={`${config.bg} ${config.border} border-2 rounded-lg p-4 flex flex-col items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer`}
-                      title={table.status === 'AVAILABLE' ? 'Clic para tomar pedido' : 'Clic para cambiar estado'}
+                      className={`${config.bg} ${config.border} border-2 rounded-xl p-3 md:p-4 flex flex-col items-center gap-0.5 md:gap-1 hover:opacity-80 active:scale-95 transition-all cursor-pointer`}
+                      title={table.status === 'AVAILABLE' ? 'Toca para tomar pedido' : 'Toca para cambiar estado'}
                     >
-                      <span className="text-white font-bold text-lg">{table.name}</span>
-                      <span className="text-white/70 text-xs">{table.capacity} personas</span>
-                      <span className="text-white/50 text-[10px] uppercase tracking-wide">{config.label}</span>
+                      <span className="text-white font-bold text-sm md:text-lg">{table.name}</span>
+                      <span className="text-white/70 text-[10px] md:text-xs">{table.capacity} pers.</span>
+                      <span className="text-white/50 text-[9px] md:text-[10px] uppercase tracking-wide">{config.label}</span>
                     </button>
                   );
                 })}
