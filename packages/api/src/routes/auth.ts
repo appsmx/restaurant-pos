@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { authService } from '../services/authService';
 import { auth, AuthRequest } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { loginSchema } from '../lib/validators';
 
 const router = Router();
 
-router.post('/login', async (req, res, next) => {
+router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
     const { username, password } = req.body;
     const result = await authService.login(username, password);

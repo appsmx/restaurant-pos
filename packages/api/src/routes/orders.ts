@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { orderService } from '../services/orderService';
 import { auth, AuthRequest } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { createOrderSchema, addOrderItemSchema, payOrderSchema } from '../lib/validators';
 
 const router = Router();
 router.use(auth);
 
-router.post('/', async (req: AuthRequest, res, next) => {
+router.post('/', validate(createOrderSchema), async (req: AuthRequest, res, next) => {
   try {
     const { tableId, type } = req.body;
     const order = await orderService.createOrder(req.userId!, tableId, type);
@@ -15,7 +17,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
   }
 });
 
-router.post('/:id/items', async (req, res, next) => {
+router.post('/:id/items', validate(addOrderItemSchema), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { productId, quantity, notes } = req.body;
@@ -45,11 +47,11 @@ router.get('/active', async (req, res, next) => {
   }
 });
 
-// --- ESTA ES LA RUTA NUEVA ---
-router.patch('/:id/pay', async (req, res, next) => {
+router.patch('/:id/pay', validate(payOrderSchema), async (req: AuthRequest, res, next) => {
   try {
     const { id } = req.params;
-    const order = await orderService.closeOrder(id);
+    const { method } = req.body;
+    const order = await orderService.closeOrder(id, req.userId!, method);
     res.json(order);
   } catch (error) {
     next(error);

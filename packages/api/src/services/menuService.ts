@@ -6,6 +6,12 @@ export const menuService = {
     return prisma.category.findMany({
       where: { active: true },
       orderBy: { sort: 'asc' },
+      include: {
+        products: {
+          where: { active: true },
+          orderBy: { name: 'asc' },
+        },
+      },
     });
   },
 
