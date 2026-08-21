@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { inventoryService } from './inventoryService';
 
 export const orderService = {
   createOrder: async (userId: string, tableId?: string, type: string = 'DINE_IN') => {
@@ -103,6 +104,15 @@ export const orderService = {
         where: { id: order.tableId },
         data: { status: 'AVAILABLE' }
       });
+    }
+
+    // 4. Descontar stock de ingredientes automáticamente
+    try {
+      await inventoryService.deductStockForOrder(orderId, userId);
+    } catch (err) {
+      // No bloquear el cierre de la orden si falla el descuento de stock
+      // (puede que no haya recetas configuradas aún)
+      console.warn('Advertencia: No se pudo descontar stock para orden', orderId, err);
     }
 
     return closedOrder;
