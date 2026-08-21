@@ -48,7 +48,7 @@ export default function OrderPanel() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 30000); // refresca cada 30s
+    const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -58,7 +58,6 @@ export default function OrderPanel() {
     setPayingId(orderId);
     try {
       await apiClient(`/orders/${orderId}/pay`, 'PATCH', { method: 'CASH' });
-      // Al pagar, la orden pasa a CLOSED y desaparece de las activas. Refrescamos.
       fetchOrders();
     } catch (err) {
       alert('Error al procesar el pago');
@@ -72,30 +71,30 @@ export default function OrderPanel() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Órdenes Activas</h1>
-        <button onClick={fetchOrders} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors">
-          Refrescar
+      <div className="flex items-center justify-between mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold">Órdenes Activas</h1>
+        <button onClick={fetchOrders} className="px-3 py-2 md:px-4 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-300 rounded-lg text-xs md:text-sm transition-colors">
+          🔄 Refrescar
         </button>
       </div>
 
       {orders.length === 0 ? (
-        <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400">
+        <div className="bg-gray-800 rounded-xl p-8 text-center text-gray-400">
           <p className="text-4xl mb-2">🧾</p>
           <p>No hay órdenes activas actualmente</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {orders.map((order) => {
             const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.OPEN;
             const isPaying = payingId === order.id;
             
             return (
-              <div key={order.id} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden flex flex-col">
+              <div key={order.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden flex flex-col">
                 {/* Cabecera */}
-                <div className={`px-4 py-2 ${config.bg} flex items-center justify-between`}>
+                <div className={`px-3 md:px-4 py-2.5 ${config.bg} flex items-center justify-between`}>
                   <span className="text-white font-bold text-sm">
-                    {order.table ? `Mesa: ${order.table.name}` : 'Para llevar'}
+                    {order.table ? `🍽️ ${order.table.name}` : '📦 Para llevar'}
                   </span>
                   <span className="bg-black/20 text-white text-xs px-2 py-0.5 rounded-full">
                     {config.label}
@@ -103,32 +102,32 @@ export default function OrderPanel() {
                 </div>
 
                 {/* Lista de items */}
-                <div className="p-4 space-y-2 flex-1">
+                <div className="p-3 md:p-4 space-y-2 flex-1">
                   {order.items.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
-                      <div className="text-gray-300">
+                      <div className="text-gray-300 flex-1">
                         <span className="text-gray-500 mr-1">x{item.quantity}</span>
-                        {item.product.name}
-                        {item.notes && <span className="text-blue-400 ml-1">*{item.notes}</span>}
+                        <span className="line-clamp-1">{item.product.name}</span>
+                        {item.notes && <span className="text-blue-400 ml-1 text-xs">*{item.notes}</span>}
                       </div>
-                      <span className="text-gray-400">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                      <span className="text-gray-400 ml-2 shrink-0">${(item.unitPrice * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Pie de la orden + Botón de cobrar */}
-                <div className="px-4 py-3 border-t border-gray-700 space-y-3">
+                <div className="px-3 md:px-4 py-3 border-t border-gray-700 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-xs">Mesero: {order.user.name}</span>
+                    <span className="text-gray-500 text-xs">👤 {order.user.name}</span>
                     <span className="text-white font-bold text-lg">${order.total?.toFixed(2)}</span>
                   </div>
                   
                   <button
                     onClick={() => handlePay(order.id)}
                     disabled={isPaying}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-bold py-2.5 rounded-lg transition-colors text-sm"
+                    className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-600 text-white font-bold py-3 md:py-2.5 rounded-xl md:rounded-lg transition-colors text-sm"
                   >
-                    {isPaying ? 'Procesando...' : `Cobrar $${order.total?.toFixed(2)}`}
+                    {isPaying ? 'Procesando...' : `💰 Cobrar $${order.total?.toFixed(2)}`}
                   </button>
                 </div>
               </div>

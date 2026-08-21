@@ -1,6 +1,5 @@
 import { useAuthStore } from '../stores/authStore';
-
-type View = 'floorplan' | 'menu' | 'orders';
+import { View } from './POSLayout';
 
 interface SidebarProps {
   activeView: View;
@@ -11,6 +10,7 @@ const menuItems: { view: View; label: string; icon: string }[] = [
   { view: 'floorplan', label: 'Mesas', icon: '🏗️' },
   { view: 'menu', label: 'Menú', icon: '📋' },
   { view: 'orders', label: 'Órdenes', icon: '🧾' },
+  { view: 'tips', label: 'Tips', icon: '💡' },
 ];
 
 export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
@@ -18,7 +18,7 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const logout = useAuthStore((s) => s.logout);
 
   return (
-    <aside className="w-20 bg-gray-900 flex flex-col items-center py-4 gap-2">
+    <aside className="w-20 bg-gray-900 flex flex-col items-center py-4 gap-2 h-full">
       <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg mb-4">
         P
       </div>

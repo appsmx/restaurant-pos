@@ -185,13 +185,14 @@ SyncQueue (cola offline)
 
 - [ ] Módulo de inventario (backend: schema listo, falta service + routes)
 - [ ] Historial de órdenes cerradas
-- [ ] Reportes / estadísticas
+- [ ] Reportes / estadísticas / dashboard del dueño
 - [ ] Pantalla de cocina (KDS)
-- [ ] Responsive / PWA
+- [x] ~~Responsive / PWA~~ ✅ (Sesión 2)
 - [ ] Deploy a producción
 - [ ] Tests (unitarios e integración)
 - [ ] Impresión de tickets
 - [ ] WebSockets (tiempo real)
+- [x] ~~Sección de Consejos~~ ✅ (Sesión 2)
 
 ---
 
@@ -311,7 +312,47 @@ SyncQueue (cola offline)
 
 **Metodología aplicada:** LOGAN (filosofía: pensar → documentar → construir → auditar)
 
-**Próximo objetivo:** Implementar módulo de inventario (ingredientes, stock, recetas, descontar al vender).
+**Próximo objetivo:** Responsive + PWA + Sección de Consejos.
+
+---
+
+### Sesión 2026-08-20 (2) — Responsive + PWA + Consejos
+
+**Objetivo:** Hacer la app usable en dispositivos móviles, instalable como PWA, y agregar una sección de consejos prácticos para el personal del restaurante.
+
+**Decisiones técnicas:**
+
+**DEC-008: Layout responsive con bottom navigation en móvil**
+- Desktop: mantiene sidebar lateral izquierda (80px)
+- Móvil: sidebar se oculta, aparece bottom navigation fija (estilo app nativa)
+- Justificación: El patrón bottom-nav es el estándar de apps móviles — el pulgar lo alcanza fácilmente.
+
+**DEC-009: Carrito como drawer deslizable en móvil**
+- Desktop: carrito flotante `absolute` (como antes)
+- Móvil: FAB button (🛒) que abre un drawer desde abajo con backdrop
+- Justificación: El carrito flotante de 320px tapa toda la pantalla en móvil. El drawer se abre solo cuando el usuario quiere verlo.
+
+**DEC-010: PWA con service worker network-first**
+- Strategy: network-first para assets, skip de llamadas API (siempre frescas)
+- Justificación: Un POS necesita datos en tiempo real — no se cachean órdenes ni mesas. Pero sí el shell de la app para arranque rápido.
+
+**DEC-011: Sección de Consejos integrada en la navegación principal**
+- 24 tips prácticos en 4 categorías (Economía, Cocina, Cajeros, Meseros)
+- Justificación: Agrega valor diferencial para el dueño del restaurante — el POS no solo cobra, también educa al equipo.
+
+**Logros:**
+1. ✅ Layout rediseñado — sidebar desktop + bottom nav móvil
+2. ✅ MenuBrowser responsive — tabs horizontales + carrito drawer
+3. ✅ FloorPlan responsive — grid 3 cols, touch feedback, tamaños adaptables
+4. ✅ OrderPanel responsive — cards apiladas, botones grandes para touch
+5. ✅ Login responsive — max-w-sm, inputs grandes, logo centrado
+6. ✅ PWA completa — manifest.json, service worker, iconos, meta tags Apple
+7. ✅ Sección Tips — 24 consejos en 4 categorías para todo el equipo
+8. ✅ Biblia actualizada
+
+**Archivos creados/modificados:** 14 archivos frontend
+
+**Próximo objetivo:** Dashboard + Reportes de ventas para el dueño (Sesión 3).
 
 ---
 
