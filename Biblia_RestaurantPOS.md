@@ -183,7 +183,7 @@ SyncQueue (cola offline)
 
 ### 5.3 Lo que NO existe todavía
 
-- [ ] Módulo de inventario (backend: schema listo, falta service + routes)
+- [x] ~~Módulo de inventario~~ ✅ (Sesión 4)
 - [x] ~~Historial de órdenes cerradas~~ ✅ (Sesión 3)
 - [x] ~~Reportes / estadísticas / dashboard del dueño~~ ✅ (Sesión 3)
 - [ ] Pantalla de cocina (KDS)
@@ -397,6 +397,47 @@ SyncQueue (cola offline)
 **Archivos creados/modificados:** 7 archivos (3 backend + 4 frontend)
 
 **Próximo objetivo:** Módulo de Inventario (Sesión 4) — ingredientes, stock, recetas, descontar al vender.
+
+---
+
+### Sesión 2026-08-20 (4) — Módulo de Inventario
+
+**Objetivo:** Implementar control de inventario completo: ingredientes, stock, movimientos, recetas (producto → ingredientes), y descuento automático al cerrar una orden.
+
+**Decisiones técnicas:**
+
+**DEC-016: Inventario basado en movimientos (no solo stock estático)**
+- Cada cambio de stock crea un `StockMovement` (IN, OUT, ADJUSTMENT, WASTE)
+- El historial queda completo para auditoría (quién, cuándo, por qué)
+- Justificación: Art. I (el conocimiento es un activo) — saber que se desperdiciaron 5kg de tomate es info valiosa para reducir costos.
+
+**DEC-017: Recetas como vínculo entre productos e ingredientes**
+- `RecipeIngredient`: productId + ingredientId + quantity
+- Permite saber exactamente cuánto ingrediente se usa por platillo vendido
+- Justificación: Sin recetas, no se puede descontar automáticamente ni calcular el costo real del platillo.
+
+**DEC-018: Descuento de stock graceful (no bloquea el cobro)**
+- `closeOrder` llama a `deductStockForOrder` en un try/catch
+- Si falla (no hay recetas configuradas), la orden se cierra igual
+- Justificación: Art. III (simplicidad) — un restaurante puede empezar a usar el POS sin configurar recetas, y agregarlas después sin romper nada.
+
+**DEC-019: Rutas de inventario solo para ADMIN/MANAGER**
+- 8 endpoints bajo `/api/inventory/*` protegidos con requireRole
+- Meseros y cajeros no pueden modificar stock ni recetas
+- Justificación: El inventario es responsabilidad del dueño/gerente. Un mesero no debería poder "ajustar" stock sin supervisión.
+
+**Logros:**
+1. ✅ inventoryService — CRUD ingredientes + movimientos de stock con transacciones
+2. ✅ recipeService — gestión de recetas (agregar, editar, eliminar, reemplazar)
+3. ✅ Descuento automático de stock al cerrar orden (basado en recetas × cantidad)
+4. ✅ 8 endpoints de inventario protegidos con Zod validation
+5. ✅ Página de Inventario — grid con stock colored, modales para crear/ajustar
+6. ✅ Inventario integrado en navegación (adminOnly, 7 tabs para admin)
+7. ✅ Biblia actualizada
+
+**Archivos creados/modificados:** 7 archivos (4 backend + 2 frontend + 1 doc)
+
+**Estado del proyecto:** Las 4 sesiones planeadas están completas. El sistema es un POS funcional con: auth, menú, mesas, órdenes, pagos, reportes, inventario, tips y PWA. Pendiente: deploy a producción.
 
 ---
 

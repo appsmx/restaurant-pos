@@ -6,9 +6,10 @@ import OrderPanel from '../pages/OrderPanel';
 import Tips from '../pages/Tips';
 import Dashboard from '../pages/Dashboard';
 import History from '../pages/History';
+import Inventory from '../pages/Inventory';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory';
 
 export interface NavItem {
   view: View;
@@ -23,6 +24,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'orders', label: 'Órdenes', icon: '🧾' },
   { view: 'dashboard', label: 'Dashboard', icon: '📊', adminOnly: true },
   { view: 'history', label: 'Historial', icon: '📜', adminOnly: true },
+  { view: 'inventory', label: 'Inventario', icon: '📦', adminOnly: true },
   { view: 'tips', label: 'Tips', icon: '💡' },
 ];
 
@@ -41,6 +43,7 @@ export default function POSLayout() {
       case 'tips': return <Tips />;
       case 'dashboard': return isAdmin ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;
       case 'history': return isAdmin ? <History /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'inventory': return isAdmin ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
     }
   };
 
