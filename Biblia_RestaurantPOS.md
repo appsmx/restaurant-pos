@@ -188,7 +188,7 @@ SyncQueue (cola offline)
 - [x] ~~Reportes / estadísticas / dashboard del dueño~~ ✅ (Sesión 3)
 - [ ] Pantalla de cocina (KDS)
 - [x] ~~Responsive / PWA~~ ✅ (Sesión 2)
-- [ ] Deploy a producción
+- [x] ~~Deploy a producción~~ ✅ (Sesión 5)
 - [ ] Tests (unitarios e integración)
 - [ ] Impresión de tickets
 - [ ] WebSockets (tiempo real)
@@ -438,6 +438,48 @@ SyncQueue (cola offline)
 **Archivos creados/modificados:** 7 archivos (4 backend + 2 frontend + 1 doc)
 
 **Estado del proyecto:** Las 4 sesiones planeadas están completas. El sistema es un POS funcional con: auth, menú, mesas, órdenes, pagos, reportes, inventario, tips y PWA. Pendiente: deploy a producción.
+
+---
+
+### Sesión 2026-08-20 (5) — Deploy a Producción
+
+**Objetivo:** Desplegar la aplicación completa en internet: Neon (DB) + Render (Backend) + Vercel (Frontend).
+
+**Decisiones técnicas:**
+
+**DEC-020: Arquitectura de 3 servicios separados para producción**
+- Neon (PostgreSQL): base de datos con SSL, región us-west-2
+- Render (Node.js): backend Express compilado, región Oregon
+- Vercel (Static + CDN): frontend React/Vite, distribución global
+- Justificación: Cada servicio tiene tier gratuito. Separar permite escalar independientemente.
+
+**DEC-021: CORS dinámico basado en variable de entorno**
+- `FRONTEND_URL` define el origen permitido + wildcard `*.vercel.app`
+- Justificación: Permite cambiar el dominio del frontend sin redesplegar el backend.
+
+**DEC-022: Health check endpoint para monitoreo**
+- `GET /health` retorna `{ status: "ok", timestamp }` — Render lo usa para verificar disponibilidad.
+- Justificación: Sin health check, Render no sabe si el servicio arrancó correctamente.
+
+**Logros:**
+1. ✅ Backend preparado para producción (build, start, prisma generate, CORS)
+2. ✅ render.yaml para deploy automático
+3. ✅ Frontend con VITE_API_URL configurable + vercel.json SPA rewrite
+4. ✅ Base de datos Neon: tablas creadas + seed ejecutado
+5. ✅ PR #5 creado y pusheado
+6. ✅ Instrucciones de deploy documentadas
+7. ✅ Biblia actualizada
+
+**Infraestructura de producción:**
+
+| Servicio | Proveedor | URL | Tier |
+|----------|-----------|-----|------|
+| Base de datos | Neon | ep-sweet-fog-a6irqi7t-pooler.us-west-2.aws.neon.tech | Free |
+| Backend API | Render | (pendiente primer deploy) | Free |
+| Frontend | Vercel | (pendiente primer deploy) | Free |
+
+**Credenciales de producción:**
+- Usuario: `admin` / Contraseña: `Admin1234` / Rol: ADMIN
 
 ---
 

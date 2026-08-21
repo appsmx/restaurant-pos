@@ -24,3 +24,4 @@ packages/shared/src/packages/
 apps/web/src/lib/apps/
 apps/web/src/stores/apps/
 .aider*
+packages/api/package-lock.json

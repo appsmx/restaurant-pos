@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: restaurant-pos-api
+    runtime: node
+    region: oregon
+    rootDir: packages/api
+    buildCommand: npm install && npm run build
+    startCommand: npm run migrate:deploy && npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
