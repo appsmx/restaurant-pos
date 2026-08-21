@@ -4,16 +4,17 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
     "migrate": "prisma migrate dev",
-    "seed": "ts-node prisma/seed.ts"
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "ts-node prisma/seed.ts",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@pos/shared": "workspace:*",
     "@prisma/client": "^5.10.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
