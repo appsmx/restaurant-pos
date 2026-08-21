@@ -1,19 +1,13 @@
 import { useAuthStore } from '../stores/authStore';
-import { View } from './POSLayout';
+import { View, NavItem } from './POSLayout';
 
 interface SidebarProps {
   activeView: View;
   onViewChange: (view: View) => void;
+  navItems: NavItem[];
 }
 
-const menuItems: { view: View; label: string; icon: string }[] = [
-  { view: 'floorplan', label: 'Mesas', icon: '🏗️' },
-  { view: 'menu', label: 'Menú', icon: '📋' },
-  { view: 'orders', label: 'Órdenes', icon: '🧾' },
-  { view: 'tips', label: 'Tips', icon: '💡' },
-];
-
-export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
+export default function Sidebar({ activeView, onViewChange, navItems }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
 
@@ -23,7 +17,7 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
         P
       </div>
 
-      {menuItems.map((item) => (
+      {navItems.map((item) => (
         <button
           key={item.view}
           onClick={() => onViewChange(item.view)}

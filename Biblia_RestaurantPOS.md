@@ -184,8 +184,8 @@ SyncQueue (cola offline)
 ### 5.3 Lo que NO existe todavía
 
 - [ ] Módulo de inventario (backend: schema listo, falta service + routes)
-- [ ] Historial de órdenes cerradas
-- [ ] Reportes / estadísticas / dashboard del dueño
+- [x] ~~Historial de órdenes cerradas~~ ✅ (Sesión 3)
+- [x] ~~Reportes / estadísticas / dashboard del dueño~~ ✅ (Sesión 3)
 - [ ] Pantalla de cocina (KDS)
 - [x] ~~Responsive / PWA~~ ✅ (Sesión 2)
 - [ ] Deploy a producción
@@ -353,6 +353,50 @@ SyncQueue (cola offline)
 **Archivos creados/modificados:** 14 archivos frontend
 
 **Próximo objetivo:** Dashboard + Reportes de ventas para el dueño (Sesión 3).
+
+---
+
+### Sesión 2026-08-20 (3) — Dashboard + Reportes de Ventas
+
+**Objetivo:** Dar al dueño del restaurante visibilidad completa de su negocio desde el celular: ventas, empleados, productos top, historial de órdenes.
+
+**Decisiones técnicas:**
+
+**DEC-012: Reportes como servicio separado con queries de agregación**
+- `reportService.ts` con 4 métodos: getSummary, getByEmployee, getByProduct, getOrderHistory
+- Queries agregan datos de Orders (CLOSED) + Payments + OrderItems
+- No se crean tablas nuevas — el schema existente tiene todo
+- Justificación: Art. III (simplicidad) — solo queries, cero migraciones.
+
+**DEC-013: Endpoints de reportes protegidos con ADMIN/MANAGER**
+- Todas las rutas `/api/reports/*` requieren `auth + requireRole('ADMIN', 'MANAGER')`
+- Un mesero NO puede ver ventas totales ni datos de otros empleados
+- Justificación: Principio de mínimo privilegio. La información financiera es del dueño.
+
+**DEC-014: Navegación dinámica según rol del usuario**
+- NavItem con flag `adminOnly: true`
+- POSLayout filtra los items visibles según `user.role`
+- ADMIN/MANAGER ven 6 tabs (Mesas, Menú, Órdenes, Dashboard, Historial, Tips)
+- WAITER/CASHIER/CHEF ven 4 tabs (Mesas, Menú, Órdenes, Tips)
+- Justificación: No exponer opciones que el usuario no puede usar. Reduce confusión.
+
+**DEC-015: Historial con paginación server-side**
+- El endpoint `/reports/history` devuelve 15 órdenes por página + metadata de paginación
+- Filtros por rango de fechas (from/to)
+- Justificación: Un restaurante con meses de operación puede tener miles de órdenes. Traer todas al frontend sería lento e ineficiente.
+
+**Logros:**
+1. ✅ reportService — ventas totales, ticket promedio, top product, por empleado, por producto
+2. ✅ Rutas /reports/* — 4 endpoints protegidos con roles
+3. ✅ Historial con paginación y filtros de fecha
+4. ✅ Dashboard con KPIs — 4 cards, ranking empleados, ranking productos, métodos de pago
+5. ✅ Vista de Historial — lista paginada con filtros, detalles de cada orden
+6. ✅ Navegación dinámica por rol — ADMIN ve 6 tabs, mesero ve 4
+7. ✅ Biblia actualizada
+
+**Archivos creados/modificados:** 7 archivos (3 backend + 4 frontend)
+
+**Próximo objetivo:** Módulo de Inventario (Sesión 4) — ingredientes, stock, recetas, descontar al vender.
 
 ---
 
