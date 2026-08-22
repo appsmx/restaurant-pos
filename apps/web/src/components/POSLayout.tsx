@@ -8,34 +8,41 @@ import Dashboard from '../pages/Dashboard';
 import History from '../pages/History';
 import Inventory from '../pages/Inventory';
 import Employees from '../pages/Employees';
+import Kitchen from '../pages/Kitchen';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees' | 'kitchen';
 
 export interface NavItem {
   view: View;
   label: string;
   icon: string;
-  adminOnly?: boolean;
+  roles?: string[]; // Si se define, solo estos roles lo ven. Si no se define, todos lo ven.
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'floorplan', label: 'Mesas', icon: '🏗️' },
   { view: 'menu', label: 'Menú', icon: '📋' },
   { view: 'orders', label: 'Órdenes', icon: '🧾' },
-  { view: 'dashboard', label: 'Dashboard', icon: '📊', adminOnly: true },
-  { view: 'history', label: 'Historial', icon: '📜', adminOnly: true },
-  { view: 'inventory', label: 'Inventario', icon: '📦', adminOnly: true },
-  { view: 'employees', label: 'Equipo', icon: '👥', adminOnly: true },
+  { view: 'kitchen', label: 'Cocina', icon: '👨‍🍳', roles: ['ADMIN', 'MANAGER', 'CHEF'] },
+  { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'MANAGER'] },
+  { view: 'history', label: 'Historial', icon: '📜', roles: ['ADMIN', 'MANAGER'] },
+  { view: 'inventory', label: 'Inventario', icon: '📦', roles: ['ADMIN', 'MANAGER'] },
+  { view: 'employees', label: 'Equipo', icon: '👥', roles: ['ADMIN'] },
   { view: 'tips', label: 'Tips', icon: '💡' },
 ];
 
 export default function POSLayout() {
   const [activeView, setActiveView] = useState<View>('floorplan');
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const userRole = user?.role || '';
 
-  const visibleItems = ALL_NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+  const visibleItems = ALL_NAV_ITEMS.filter((item) => {
+    if (!item.roles) return true; // Visible para todos
+    return item.roles.includes(userRole);
+  });
+
+  const isAllowed = (requiredRoles: string[]) => requiredRoles.includes(userRole);
 
   const renderView = () => {
     switch (activeView) {
@@ -43,10 +50,11 @@ export default function POSLayout() {
       case 'menu': return <MenuBrowser />;
       case 'orders': return <OrderPanel />;
       case 'tips': return <Tips />;
-      case 'dashboard': return isAdmin ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;
-      case 'history': return isAdmin ? <History /> : <FloorPlan onViewChange={setActiveView} />;
-      case 'inventory': return isAdmin ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
-      case 'employees': return isAdmin ? <Employees /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'kitchen': return <Kitchen />;
+      case 'dashboard': return isAllowed(['ADMIN', 'MANAGER']) ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'history': return isAllowed(['ADMIN', 'MANAGER']) ? <History /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'inventory': return isAllowed(['ADMIN', 'MANAGER']) ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'employees': return isAllowed(['ADMIN']) ? <Employees /> : <FloorPlan onViewChange={setActiveView} />;
     }
   };
 

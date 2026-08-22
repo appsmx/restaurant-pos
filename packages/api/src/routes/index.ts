@@ -6,6 +6,7 @@ import orderRoutes from './orders';
 import reportRoutes from './reports';
 import inventoryRoutes from './inventory';
 import userRoutes from './users';
+import kitchenRoutes from './kitchen';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/orders', orderRoutes);
 router.use('/reports', reportRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/users', userRoutes);
+router.use('/kitchen', kitchenRoutes);
 
 export default router;
