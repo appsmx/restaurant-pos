@@ -23,5 +23,21 @@ export const floorPlanService = {
       where: { id: tableId },
       data: { status: status as any }
     });
+  },
+  /**
+   * Verificar si una mesa tiene órdenes activas (no cerradas/canceladas)
+   */
+  getActiveOrderForTable: async (tableId: string) => {
+    const order = await prisma.order.findFirst({
+      where: {
+        tableId,
+        status: { in: ['OPEN', 'SENT', 'PREPARING', 'READY', 'DELIVERED'] }
+      },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    return order;
   }
 };

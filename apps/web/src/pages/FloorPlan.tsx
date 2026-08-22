@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { useOrderStore } from '../stores/orderStore';
+import { View } from '../components/POSLayout';
 
 interface Table {
   id: string;
@@ -26,8 +27,6 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; border: string;
 
 const STATUS_CYCLE = ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'DIRTY', 'OUT_OF_SERVICE'];
 
-import { View } from '../components/POSLayout';
-
 interface FloorPlanProps {
   onViewChange: (view: View) => void;
 }
@@ -36,6 +35,7 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [alertInfo, setAlertInfo] = useState<{ tableName: string; total: number } | null>(null);
   const setSelectedTable = useOrderStore((s) => s.setSelectedTable);
 
   const fetchSections = async () => {
@@ -59,8 +59,23 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
       // Si está disponible, la selecciona y manda al menú
       setSelectedTable({ id: table.id, name: table.name });
       onViewChange('menu');
+    } else if (table.status === 'OCCUPIED') {
+      // Si está ocupada, verificar si tiene orden activa antes de permitir cambio
+      try {
+        const { hasActiveOrder, order } = await apiClient(`/floorplan/tables/${table.id}/active-order`, 'GET');
+        if (hasActiveOrder && order) {
+          // Tiene orden activa — mostrar alerta y redirigir a cobrar
+          setAlertInfo({ tableName: table.name, total: order.total || 0 });
+        } else {
+          // No tiene orden activa (ya se cobró) — permitir cambiar estado
+          await apiClient(`/floorplan/tables/${table.id}/status`, 'PATCH', { status: 'DIRTY' });
+          fetchSections();
+        }
+      } catch (err) {
+        setError('Error al verificar estado');
+      }
     } else {
-      // Si no, ejecuta el ciclo de estados normal
+      // Para otros estados (RESERVED, DIRTY, OUT_OF_SERVICE), ciclar normalmente
       const currentIndex = STATUS_CYCLE.indexOf(table.status);
       const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
       try {
@@ -108,6 +123,34 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Alerta: mesa con orden activa */}
+      {alertInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setAlertInfo(null)} />
+          <div className="relative bg-gray-900 rounded-2xl p-5 w-full max-w-sm border border-gray-700 text-center">
+            <p className="text-3xl mb-3">⚠️</p>
+            <h3 className="text-white font-bold text-lg mb-2">{alertInfo.tableName} tiene cuenta abierta</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Esta mesa tiene una orden activa por <span className="text-emerald-400 font-bold">${alertInfo.total.toFixed(2)}</span>. Debes cobrar antes de cambiar su estado.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAlertInfo(null)}
+                className="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => { setAlertInfo(null); onViewChange('orders'); }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                💰 Ir a cobrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

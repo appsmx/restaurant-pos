@@ -37,4 +37,15 @@ router.patch('/tables/:id/status', validate(updateTableStatusSchema), async (req
   }
 });
 
+// GET /api/floorplan/tables/:id/active-order — verificar si hay orden abierta en la mesa
+router.get('/tables/:id/active-order', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await floorPlanService.getActiveOrderForTable(id);
+    res.json({ hasActiveOrder: !!order, order });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
