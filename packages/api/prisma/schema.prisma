@@ -11,6 +11,8 @@ model User {
   id        String   @id @default(uuid())
   username  String   @unique
   password  String
+  pin       String?  @unique
+  pinHash   String?
   name      String
   role      Role     @default(WAITER)
   active    Boolean  @default(true)
