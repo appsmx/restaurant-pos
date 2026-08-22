@@ -7,9 +7,10 @@ import Tips from '../pages/Tips';
 import Dashboard from '../pages/Dashboard';
 import History from '../pages/History';
 import Inventory from '../pages/Inventory';
+import Employees from '../pages/Employees';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees';
 
 export interface NavItem {
   view: View;
@@ -25,6 +26,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'dashboard', label: 'Dashboard', icon: '📊', adminOnly: true },
   { view: 'history', label: 'Historial', icon: '📜', adminOnly: true },
   { view: 'inventory', label: 'Inventario', icon: '📦', adminOnly: true },
+  { view: 'employees', label: 'Equipo', icon: '👥', adminOnly: true },
   { view: 'tips', label: 'Tips', icon: '💡' },
 ];
 
@@ -44,6 +46,7 @@ export default function POSLayout() {
       case 'dashboard': return isAdmin ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;
       case 'history': return isAdmin ? <History /> : <FloorPlan onViewChange={setActiveView} />;
       case 'inventory': return isAdmin ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'employees': return isAdmin ? <Employees /> : <FloorPlan onViewChange={setActiveView} />;
     }
   };
 

@@ -21,6 +21,8 @@ interface Order {
   user: { name: string };
 }
 
+type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER';
+
 const STATUS_CONFIG: Record<string, { label: string; bg: string }> = {
   OPEN: { label: 'Abierta', bg: 'bg-yellow-600' },
   SENT: { label: 'Enviada', bg: 'bg-orange-600' },
@@ -28,11 +30,20 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string }> = {
   READY: { label: 'Lista', bg: 'bg-emerald-600' },
 };
 
+const PAYMENT_METHODS: { method: PaymentMethod; label: string; icon: string; color: string }[] = [
+  { method: 'CASH', label: 'Efectivo', icon: '💵', color: 'border-emerald-500 bg-emerald-500/10 text-emerald-400' },
+  { method: 'CARD', label: 'Tarjeta', icon: '💳', color: 'border-blue-500 bg-blue-500/10 text-blue-400' },
+  { method: 'TRANSFER', label: 'Transferencia', icon: '📲', color: 'border-purple-500 bg-purple-500/10 text-purple-400' },
+  { method: 'OTHER', label: 'Otro', icon: '🔄', color: 'border-gray-500 bg-gray-500/10 text-gray-400' },
+];
+
 export default function OrderPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [payModal, setPayModal] = useState<Order | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('CASH');
 
   const fetchOrders = async () => {
     try {
@@ -52,12 +63,18 @@ export default function OrderPanel() {
     return () => clearInterval(interval);
   }, []);
 
-  const handlePay = async (orderId: string) => {
-    if (!confirm('¿Confirmar cobro de esta cuenta?')) return;
-    
-    setPayingId(orderId);
+  const openPayModal = (order: Order) => {
+    setPayModal(order);
+    setSelectedMethod('CASH');
+  };
+
+  const handleConfirmPay = async () => {
+    if (!payModal) return;
+
+    setPayingId(payModal.id);
+    setPayModal(null);
     try {
-      await apiClient(`/orders/${orderId}/pay`, 'PATCH', { method: 'CASH' });
+      await apiClient(`/orders/${payModal.id}/pay`, 'PATCH', { method: selectedMethod });
       fetchOrders();
     } catch (err) {
       alert('Error al procesar el pago');
@@ -123,7 +140,7 @@ export default function OrderPanel() {
                   </div>
                   
                   <button
-                    onClick={() => handlePay(order.id)}
+                    onClick={() => openPayModal(order)}
                     disabled={isPaying}
                     className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-600 text-white font-bold py-3 md:py-2.5 rounded-xl md:rounded-lg transition-colors text-sm"
                   >
@@ -133,6 +150,54 @@ export default function OrderPanel() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal: Selección de método de pago */}
+      {payModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setPayModal(null)} />
+          <div className="relative bg-gray-900 rounded-2xl p-5 w-full max-w-sm border border-gray-700">
+            <h2 className="text-white font-bold text-lg mb-1">💰 Cobrar cuenta</h2>
+            <p className="text-gray-400 text-sm mb-4">
+              {payModal.table ? `Mesa: ${payModal.table.name}` : 'Para llevar'} — Total: <span className="text-emerald-400 font-bold">${payModal.total?.toFixed(2)}</span>
+            </p>
+
+            {/* Métodos de pago */}
+            <p className="text-gray-400 text-xs mb-2">Selecciona el método de pago:</p>
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              {PAYMENT_METHODS.map((pm) => (
+                <button
+                  key={pm.method}
+                  onClick={() => setSelectedMethod(pm.method)}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    selectedMethod === pm.method
+                      ? pm.color + ' border-opacity-100 scale-[1.02]'
+                      : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                  }`}
+                >
+                  <span className="text-2xl block mb-1">{pm.icon}</span>
+                  <span className="text-xs font-medium">{pm.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPayModal(null)}
+                className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmPay}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors"
+              >
+                ✓ Confirmar cobro
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
