@@ -23,6 +23,7 @@ model User {
   orders      Order[]
   payments    Payment[]
   stockMoves  StockMovement[]
+  cashMoves   CashMovement[]
 }
 
 model Session {
@@ -264,4 +265,51 @@ model SyncQueue {
   status    String   @default("PENDING")
   createdAt DateTime @default(now())
   processedAt DateTime?
+}
+
+
+
+// ==================== CAJA ====================
+
+model CashRegister {
+  id            String   @id @default(uuid())
+  status        CashRegisterStatus @default(OPEN)
+  openingAmount Float
+  closingAmount Float?
+  expectedAmount Float?
+  difference    Float?
+  openedBy      String
+  closedBy      String?
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  notes         String?
+
+  movements     CashMovement[]
+}
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+}
+
+model CashMovement {
+  id          String           @id @default(uuid())
+  registerId  String
+  type        CashMovementType
+  amount      Float
+  description String?
+  userId      String
+  createdAt   DateTime         @default(now())
+
+  register    CashRegister     @relation(fields: [registerId], references: [id])
+  user        User             @relation(fields: [userId], references: [id])
+}
+
+enum CashMovementType {
+  OPENING
+  SALE
+  WITHDRAWAL
+  DEPOSIT
+  EXPENSE
+  CLOSING
 }
