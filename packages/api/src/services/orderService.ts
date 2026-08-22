@@ -4,12 +4,17 @@ import { inventoryService } from './inventoryService';
 
 export const orderService = {
   createOrder: async (userId: string, tableId?: string, type: string = 'DINE_IN') => {
+    // Generate next ticket number (max + 1)
+    const lastOrder = await prisma.order.findFirst({ orderBy: { ticketNumber: 'desc' } });
+    const ticketNumber = (lastOrder?.ticketNumber || 0) + 1;
+
     const order = await prisma.order.create({
       data: {
         userId,
         tableId: tableId || null,
         type: type as any,
         status: 'OPEN',
+        ticketNumber,
       },
       include: { items: true }
     });
@@ -70,12 +75,12 @@ export const orderService = {
         table: true,
         user: { select: { name: true } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { ticketNumber: 'desc' }
     });
   },
 
   // --- ESTA ES LA NUEVA ---
-  closeOrder: async (orderId: string, userId: string, method: string = 'CASH') => {
+  closeOrder: async (orderId: string, userId: string, method: string = 'CASH', customerId?: string) => {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new AppError('Orden no encontrada', 404);
     if (order.status === 'CLOSED') throw new AppError('La orden ya está cerrada', 400);
@@ -91,14 +96,36 @@ export const orderService = {
       },
     });
 
-    // 2. Cambiar estado a CLOSED y registrar timestamp
+    // 2. Cambiar estado a CLOSED, registrar timestamp y cliente (si se asignó)
     const closedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status: 'CLOSED', closedAt: new Date() },
+      data: {
+        status: 'CLOSED',
+        closedAt: new Date(),
+        ...(customerId && { customerId }),
+      },
       include: { items: true, table: true, payments: true }
     });
 
-    // 3. Si tenía mesa, liberarla (ponerla en AVAILABLE)
+    // 3. Si se asignó un cliente, registrar la visita + puntos de lealtad
+    if (customerId) {
+      try {
+        const pointsEarned = Math.floor(order.total / 10);
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: {
+            totalVisits: { increment: 1 },
+            totalSpent: { increment: order.total },
+            loyaltyPoints: { increment: pointsEarned },
+          },
+        });
+      } catch (err) {
+        // No bloquear el cobro si falla la actualización del cliente
+        console.warn('No se pudo actualizar puntos del cliente:', err);
+      }
+    }
+
+    // 4. Si tenía mesa, liberarla (ponerla en AVAILABLE)
     if (order.tableId) {
       await prisma.table.update({
         where: { id: order.tableId },

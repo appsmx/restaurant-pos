@@ -29,6 +29,7 @@ export const addOrderItemSchema = z.object({
 
 export const payOrderSchema = z.object({
   method: z.enum(['CASH', 'CARD', 'TRANSFER', 'OTHER']).optional().default('CASH'),
+  customerId: z.string().uuid().optional().nullable(),
 });
 
 // ==================== FLOORPLAN ====================

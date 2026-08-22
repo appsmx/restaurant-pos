@@ -127,15 +127,17 @@ enum TableStatus {
 }
 
 model Order {
-  id        String       @id @default(uuid())
-  tableId   String?
-  type      OrderType    @default(DINE_IN)
-  status    OrderStatus  @default(OPEN)
-  total     Float        @default(0)
-  userId    String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  closedAt  DateTime?
+  id           String       @id @default(uuid())
+  ticketNumber Int          @default(0)
+  tableId      String?
+  customerId   String?
+  type         OrderType    @default(DINE_IN)
+  status       OrderStatus  @default(OPEN)
+  total        Float        @default(0)
+  userId       String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  closedAt     DateTime?
 
   table   Table?    @relation(fields: [tableId], references: [id])
   user    User      @relation(fields: [userId], references: [id])

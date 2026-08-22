@@ -12,6 +12,7 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  ticketNumber: number;
   type: string;
   status: string;
   total: number;
@@ -44,6 +45,9 @@ export default function OrderPanel() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payModal, setPayModal] = useState<Order | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('CASH');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<{ id: string; firstName: string; lastName: string; loyaltyPoints: number }[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -66,6 +70,18 @@ export default function OrderPanel() {
   const openPayModal = (order: Order) => {
     setPayModal(order);
     setSelectedMethod('CASH');
+    setSelectedCustomer(null);
+    setCustomerSearch('');
+    setCustomerResults([]);
+  };
+
+  const searchCustomers = async (query: string) => {
+    setCustomerSearch(query);
+    if (query.length < 2) { setCustomerResults([]); return; }
+    try {
+      const results = await apiClient(`/customers?search=${encodeURIComponent(query)}`, 'GET');
+      setCustomerResults(results.slice(0, 5));
+    } catch { setCustomerResults([]); }
   };
 
   const handleConfirmPay = async () => {
@@ -74,7 +90,10 @@ export default function OrderPanel() {
     setPayingId(payModal.id);
     setPayModal(null);
     try {
-      await apiClient(`/orders/${payModal.id}/pay`, 'PATCH', { method: selectedMethod });
+      await apiClient(`/orders/${payModal.id}/pay`, 'PATCH', {
+        method: selectedMethod,
+        customerId: selectedCustomer?.id || null,
+      });
       fetchOrders();
     } catch (err) {
       alert('Error al procesar el pago');
@@ -113,9 +132,12 @@ export default function OrderPanel() {
                   <span className="text-white font-bold text-sm">
                     {order.table ? `🍽️ ${order.table.name}` : '📦 Para llevar'}
                   </span>
-                  <span className="bg-black/20 text-white text-xs px-2 py-0.5 rounded-full">
-                    {config.label}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/70 text-xs font-mono">#{order.ticketNumber || '—'}</span>
+                    <span className="bg-black/20 text-white text-xs px-2 py-0.5 rounded-full">
+                      {config.label}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Lista de items */}
@@ -180,6 +202,41 @@ export default function OrderPanel() {
                   <span className="text-xs font-medium">{pm.label}</span>
                 </button>
               ))}
+            </div>
+
+            {/* Asignar cliente (opcional — para puntos de lealtad) */}
+            <div className="mb-4">
+              <p className="text-gray-400 text-xs mb-2">Asignar cliente (opcional):</p>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/30 rounded-xl px-3 py-2">
+                  <span className="text-blue-400 text-sm font-medium">👤 {selectedCustomer.name}</span>
+                  <button onClick={() => setSelectedCustomer(null)} className="text-gray-400 hover:text-white text-xs">✕</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => searchCustomers(e.target.value)}
+                    className="w-full bg-gray-800 text-white text-sm rounded-xl border border-gray-600 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                    placeholder="Buscar por nombre o teléfono..."
+                  />
+                  {customerResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-xl overflow-hidden z-10">
+                      {customerResults.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => { setSelectedCustomer({ id: c.id, name: `${c.firstName} ${c.lastName}` }); setCustomerResults([]); setCustomerSearch(''); }}
+                          className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex justify-between"
+                        >
+                          <span>{c.firstName} {c.lastName}</span>
+                          <span className="text-emerald-400 text-xs">{c.loyaltyPoints} pts</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Botones */}

@@ -72,7 +72,17 @@ export default function POSLayout() {
       </div>
 
       {/* Contenido principal */}
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+      <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6 relative">
+        {/* Mobile header with user info + logout */}
+        <div className="md:hidden flex items-center justify-between mb-3">
+          <span className="text-gray-500 text-xs">👤 {user?.name || user?.username || 'Usuario'}</span>
+          <button
+            onClick={() => { useAuthStore.getState().logout(); }}
+            className="text-gray-500 hover:text-red-400 text-xs px-2 py-1 rounded-lg transition-colors"
+          >
+            Salir ↗
+          </button>
+        </div>
         {renderView()}
       </main>
 

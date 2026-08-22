@@ -91,6 +91,22 @@ export default function Employees() {
     }
   };
 
+  const [pinModal, setPinModal] = useState<string | null>(null);
+  const [pinValue, setPinValue] = useState('');
+
+  const handleSetPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinModal) return;
+    try {
+      await apiClient(`/users/${pinModal}/pin`, 'PATCH', { pin: pinValue });
+      alert('✅ PIN asignado correctamente');
+      setPinModal(null);
+      setPinValue('');
+    } catch (err: any) {
+      alert(err.message || 'Error al asignar PIN');
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><p className="text-gray-400 text-lg">Cargando usuarios...</p></div>;
   if (error) return <div className="flex items-center justify-center h-64"><p className="text-red-400 text-lg text-center px-4">{error}</p></div>;
 
@@ -163,6 +179,14 @@ export default function Employees() {
                     }`}
                   >
                     {user.active ? 'Desactivar' : 'Activar'}
+                  </button>
+
+                  {/* Assign PIN */}
+                  <button
+                    onClick={() => { setPinModal(user.id); setPinValue(''); }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20 transition-colors"
+                  >
+                    🔢 PIN
                   </button>
                 </div>
               </div>
@@ -245,6 +269,47 @@ export default function Employees() {
           </div>
         </div>
       )}
+
+      {/* Modal: Asignar PIN */}
+      {pinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setPinModal(null)} />
+          <div className="relative bg-gray-900 rounded-2xl p-5 w-full max-w-xs border border-gray-700 text-center">
+            <h2 className="text-white font-bold text-lg mb-2">🔢 Asignar PIN</h2>
+            <p className="text-gray-400 text-sm mb-4">Este PIN se usará para login rápido (4 dígitos)</p>
+            <form onSubmit={handleSetPin} className="space-y-4">
+              <input
+                type="text"
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                className="w-full bg-gray-800 text-white text-2xl rounded-xl border border-gray-600 px-4 py-3 focus:border-blue-500 focus:outline-none text-center font-bold tracking-[0.5em]"
+                placeholder="• • • •"
+                maxLength={4}
+                inputMode="numeric"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setPinModal(null)} className="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl">Cancelar</button>
+                <button type="submit" disabled={pinValue.length !== 4} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm font-bold rounded-xl">
+                  Guardar PIN
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Leyenda de roles */}
+      <div className="mt-6 bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+        <h3 className="text-gray-300 text-sm font-semibold mb-2">📖 ¿Qué puede hacer cada rol?</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-400">
+          <div><span className="text-purple-400 font-medium">Admin:</span> Todo el sistema sin restricciones</div>
+          <div><span className="text-blue-400 font-medium">Gerente:</span> Todo excepto gestión de empleados</div>
+          <div><span className="text-amber-400 font-medium">Cajero:</span> Cobrar, caja, clientes, órdenes</div>
+          <div><span className="text-emerald-400 font-medium">Mesero:</span> Mesas, menú, tomar pedidos, clientes</div>
+          <div><span className="text-orange-400 font-medium">Cocinero:</span> Pantalla de cocina (ver y completar pedidos)</div>
+        </div>
+      </div>
     </div>
   );
 }

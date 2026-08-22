@@ -50,8 +50,8 @@ router.get('/active', async (req, res, next) => {
 router.patch('/:id/pay', validate(payOrderSchema), async (req: AuthRequest, res, next) => {
   try {
     const { id } = req.params;
-    const { method } = req.body;
-    const order = await orderService.closeOrder(id, req.userId!, method);
+    const { method, customerId } = req.body;
+    const order = await orderService.closeOrder(id, req.userId!, method, customerId);
     res.json(order);
   } catch (error) {
     next(error);
