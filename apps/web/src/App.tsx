@@ -1,4 +1,4 @@
-﻿import { useAuthStore } from './stores/authStore';
+import { useAuthStore } from './stores/authStore';
 import Login from './pages/Login';
 import POSLayout from './components/POSLayout';
 
