@@ -8,6 +8,7 @@ import inventoryRoutes from './inventory';
 import userRoutes from './users';
 import kitchenRoutes from './kitchen';
 import cashRoutes from './cash';
+import customerRoutes from './customers';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/inventory', inventoryRoutes);
 router.use('/users', userRoutes);
 router.use('/kitchen', kitchenRoutes);
 router.use('/cash', cashRoutes);
+router.use('/customers', customerRoutes);
 
 export default router;

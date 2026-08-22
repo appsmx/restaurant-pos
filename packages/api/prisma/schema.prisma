@@ -313,3 +313,22 @@ enum CashMovementType {
   EXPENSE
   CLOSING
 }
+
+
+
+// ==================== CLIENTES ====================
+
+model Customer {
+  id            String    @id @default(uuid())
+  firstName     String
+  lastName      String
+  phone         String?
+  email         String?
+  birthday      DateTime?
+  notes         String?
+  loyaltyPoints Int       @default(0)
+  totalVisits   Int       @default(0)
+  totalSpent    Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
