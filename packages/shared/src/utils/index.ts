@@ -1,4 +1,4 @@
-﻿export function formatCurrency(amount: number, currency: string = 'MXN'): string {
+export function formatCurrency(amount: number, currency: string = 'MXN'): string {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount);
 }
 export function roundToDecimal(value: number, decimals: number = 2): number {
