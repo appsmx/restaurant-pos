@@ -9,15 +9,16 @@ import History from '../pages/History';
 import Inventory from '../pages/Inventory';
 import Employees from '../pages/Employees';
 import Kitchen from '../pages/Kitchen';
+import CashRegister from '../pages/CashRegister';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees' | 'kitchen';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees' | 'kitchen' | 'cash';
 
 export interface NavItem {
   view: View;
   label: string;
   icon: string;
-  roles?: string[]; // Si se define, solo estos roles lo ven. Si no se define, todos lo ven.
+  roles?: string[];
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -25,6 +26,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'menu', label: 'Menú', icon: '📋' },
   { view: 'orders', label: 'Órdenes', icon: '🧾' },
   { view: 'kitchen', label: 'Cocina', icon: '👨‍🍳', roles: ['ADMIN', 'MANAGER', 'CHEF'] },
+  { view: 'cash', label: 'Caja', icon: '💰', roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
   { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'MANAGER'] },
   { view: 'history', label: 'Historial', icon: '📜', roles: ['ADMIN', 'MANAGER'] },
   { view: 'inventory', label: 'Inventario', icon: '📦', roles: ['ADMIN', 'MANAGER'] },
@@ -51,6 +53,7 @@ export default function POSLayout() {
       case 'orders': return <OrderPanel />;
       case 'tips': return <Tips />;
       case 'kitchen': return <Kitchen />;
+      case 'cash': return isAllowed(['ADMIN', 'MANAGER', 'CASHIER']) ? <CashRegister /> : <FloorPlan onViewChange={setActiveView} />;
       case 'dashboard': return isAllowed(['ADMIN', 'MANAGER']) ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;
       case 'history': return isAllowed(['ADMIN', 'MANAGER']) ? <History /> : <FloorPlan onViewChange={setActiveView} />;
       case 'inventory': return isAllowed(['ADMIN', 'MANAGER']) ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
