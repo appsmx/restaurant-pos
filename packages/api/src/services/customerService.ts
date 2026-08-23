@@ -88,4 +88,42 @@ export const customerService = {
       data: { loyaltyPoints: { decrement: points } },
     });
   },
+
+  /**
+   * Historial de compras de un cliente (órdenes asociadas por customerId)
+   */
+  getPurchaseHistory: async (id: string, page: number = 1, limit: number = 15) => {
+    const customer = await prisma.customer.findUnique({ where: { id } });
+    if (!customer) throw new AppError('Cliente no encontrado', 404);
+
+    const where = { customerId: id, status: 'CLOSED' as const };
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: { include: { product: { select: { name: true, price: true } } } },
+          table: { select: { name: true } },
+          user: { select: { name: true } },
+          closedBy: { select: { name: true } },
+          payments: { select: { method: true, amount: true, createdAt: true } },
+        },
+        orderBy: { closedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    return {
+      customer,
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  },
 };

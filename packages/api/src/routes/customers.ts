@@ -88,4 +88,19 @@ router.post('/:id/redeem', async (req, res, next) => {
   }
 });
 
+// GET /api/customers/:id/history — historial de compras del cliente
+router.get('/:id/history', async (req, res, next) => {
+  try {
+    const { page, limit } = req.query;
+    const data = await customerService.getPurchaseHistory(
+      req.params.id,
+      page ? parseInt(page as string) : 1,
+      limit ? parseInt(limit as string) : 15
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

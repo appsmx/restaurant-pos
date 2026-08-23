@@ -14,12 +14,50 @@ interface Customer {
   totalSpent: number;
 }
 
+interface OrderHistoryItem {
+  id: string;
+  total: number;
+  type: string;
+  closedAt: string;
+  table: { name: string } | null;
+  user: { name: string };
+  items: { quantity: number; product: { name: string; price: number } }[];
+  payments: { method: string; amount: number; createdAt: string }[];
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+const METHOD_ICONS: Record<string, string> = {
+  CASH: '💵',
+  CARD: '💳',
+  TRANSFER: '📲',
+  OTHER: '🔄',
+};
+
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'Efectivo',
+  CARD: 'Tarjeta',
+  TRANSFER: 'Transferencia',
+  OTHER: 'Otro',
+};
+
 export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Profile/History view
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [history, setHistory] = useState<OrderHistoryItem[]>([]);
+  const [historyPagination, setHistoryPagination] = useState<Pagination>({ page: 1, limit: 15, total: 0, pages: 0 });
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Form
   const [firstName, setFirstName] = useState('');
@@ -39,6 +77,24 @@ export default function Customers() {
       console.error('Error fetching customers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHistory = async (customerId: string, page: number = 1) => {
+    try {
+      setLoadingHistory(true);
+      const data = await apiClient(`/customers/${customerId}/history?page=${page}&limit=15`, 'GET');
+      setHistory(data.orders);
+      setHistoryPagination(data.pagination);
+      // Update customer data with latest stats
+      if (data.customer) {
+        setSelectedCustomer(data.customer);
+      }
+    } catch (err) {
+      console.error('Error fetching history');
+      setHistory([]);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -75,8 +131,198 @@ export default function Customers() {
     setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setBirthday(''); setNotes('');
   };
 
+  const openProfile = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    fetchHistory(customer.id, 1);
+  };
+
+  const closeProfile = () => {
+    setSelectedCustomer(null);
+    setHistory([]);
+  };
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><p className="text-gray-400">Cargando clientes...</p></div>;
 
+  // ==================== PROFILE VIEW ====================
+  if (selectedCustomer) {
+    return (
+      <div>
+        {/* Back button + header */}
+        <div className="flex items-center gap-3 mb-5">
+          <button
+            onClick={closeProfile}
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-xl transition-colors"
+          >
+            ← Volver
+          </button>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">
+              👤 {selectedCustomer.firstName} {selectedCustomer.lastName}
+            </h1>
+            <p className="text-gray-500 text-xs mt-0.5">Perfil y historial de compras</p>
+          </div>
+        </div>
+
+        {/* Customer stats cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-3 text-center">
+            <p className="text-emerald-400 font-bold text-lg md:text-xl">{selectedCustomer.loyaltyPoints}</p>
+            <p className="text-gray-500 text-xs mt-0.5">🎖️ Puntos</p>
+          </div>
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-3 text-center">
+            <p className="text-blue-400 font-bold text-lg md:text-xl">{selectedCustomer.totalVisits}</p>
+            <p className="text-gray-500 text-xs mt-0.5">📍 Visitas</p>
+          </div>
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-3 text-center">
+            <p className="text-purple-400 font-bold text-lg md:text-xl">
+              ${selectedCustomer.totalSpent.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+            </p>
+            <p className="text-gray-500 text-xs mt-0.5">💰 Total gastado</p>
+          </div>
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-3 text-center">
+            <p className="text-amber-400 font-bold text-lg md:text-xl">
+              ${selectedCustomer.totalVisits > 0 ? Math.round(selectedCustomer.totalSpent / selectedCustomer.totalVisits) : 0}
+            </p>
+            <p className="text-gray-500 text-xs mt-0.5">🎫 Ticket promedio</p>
+          </div>
+        </div>
+
+        {/* Customer contact info */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-4 mb-5">
+          <h2 className="text-white font-semibold text-sm mb-3">📇 Información de contacto</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {selectedCustomer.phone && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-xs">📱</span>
+                <span className="text-white text-sm">{selectedCustomer.phone}</span>
+              </div>
+            )}
+            {selectedCustomer.email && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-xs">✉️</span>
+                <span className="text-white text-sm">{selectedCustomer.email}</span>
+              </div>
+            )}
+            {selectedCustomer.birthday && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-xs">🎂</span>
+                <span className="text-white text-sm">
+                  {new Date(selectedCustomer.birthday).toLocaleDateString('es-MX', { day: '2-digit', month: 'long' })}
+                </span>
+              </div>
+            )}
+            {selectedCustomer.notes && (
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <span className="text-gray-500 text-xs">📝</span>
+                <span className="text-gray-400 text-sm italic">{selectedCustomer.notes}</span>
+              </div>
+            )}
+            {!selectedCustomer.phone && !selectedCustomer.email && !selectedCustomer.birthday && !selectedCustomer.notes && (
+              <p className="text-gray-500 text-xs col-span-2">Sin información de contacto registrada</p>
+            )}
+          </div>
+        </div>
+
+        {/* Purchase history */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+            <h2 className="text-white font-semibold text-sm md:text-base">🧾 Historial de compras</h2>
+            <span className="text-gray-500 text-xs">
+              {historyPagination.total} {historyPagination.total === 1 ? 'compra' : 'compras'}
+            </span>
+          </div>
+
+          {loadingHistory ? (
+            <div className="p-8 text-center"><p className="text-gray-400 text-sm">Cargando historial...</p></div>
+          ) : history.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-3xl mb-2">🛒</p>
+              <p className="text-gray-400 text-sm">Este cliente no tiene compras registradas</p>
+              <p className="text-gray-600 text-xs mt-1">Las compras aparecerán cuando se asigne este cliente al cobrar una orden</p>
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-gray-700/50">
+                {history.map((order) => (
+                  <div key={order.id} className="px-4 py-3">
+                    {/* Order header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white text-sm font-medium">
+                          {order.table ? `🍽️ ${order.table.name}` : '📦 Para llevar'}
+                        </span>
+                        <span className="text-gray-600">·</span>
+                        <span className="text-gray-500 text-xs">
+                          {formatDate(order.closedAt)} {formatTime(order.closedAt)}
+                        </span>
+                      </div>
+                      <span className="text-emerald-400 font-bold text-sm">
+                        ${order.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Items */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {order.items.map((item, idx) => (
+                        <span key={idx} className="px-2 py-0.5 bg-gray-700 rounded-full text-xs text-gray-300">
+                          {item.quantity}x {item.product.name}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Payment info */}
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      {order.payments.length > 0 && (
+                        <span>
+                          {METHOD_ICONS[order.payments[0].method]} {METHOD_LABELS[order.payments[0].method] || order.payments[0].method}
+                        </span>
+                      )}
+                      <span>👤 Atendido por: {order.user.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {historyPagination.pages > 1 && (
+                <div className="px-4 py-3 border-t border-gray-700 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => fetchHistory(selectedCustomer.id, historyPagination.page - 1)}
+                    disabled={historyPagination.page <= 1}
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs rounded-lg transition-colors"
+                  >
+                    ← Anterior
+                  </button>
+                  <span className="text-gray-400 text-xs px-2">
+                    Página {historyPagination.page} de {historyPagination.pages}
+                  </span>
+                  <button
+                    onClick={() => fetchHistory(selectedCustomer.id, historyPagination.page + 1)}
+                    disabled={historyPagination.page >= historyPagination.pages}
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs rounded-lg transition-colors"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== MAIN LIST VIEW ====================
   return (
     <div>
       {/* Header */}
@@ -117,7 +363,11 @@ export default function Customers() {
       ) : (
         <div className="space-y-3">
           {customers.map((c) => (
-            <div key={c.id} className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+            <button
+              key={c.id}
+              onClick={() => openProfile(c)}
+              className="w-full bg-gray-800 rounded-xl border border-gray-700 p-4 text-left hover:bg-gray-750 hover:border-gray-600 transition-colors"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center text-blue-400 font-bold text-sm shrink-0">
@@ -139,7 +389,7 @@ export default function Customers() {
                   <p className="text-gray-500 text-xs">${c.totalSpent.toFixed(0)} total</p>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

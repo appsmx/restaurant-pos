@@ -8,6 +8,7 @@ interface OrderHistoryItem {
   closedAt: string;
   table: { name: string } | null;
   user: { name: string };
+  closedBy: { name: string } | null;
   items: { quantity: number; product: { name: string } }[];
   payments: { method: string; amount: number }[];
 }
@@ -149,7 +150,13 @@ export default function History() {
                       {order.table ? `🍽️ ${order.table.name}` : '📦 Para llevar'}
                     </span>
                     <span className="text-gray-500 text-xs">·</span>
-                    <span className="text-gray-400 text-xs">👤 {order.user.name}</span>
+                    <span className="text-gray-400 text-xs">🍽️ {order.user.name}</span>
+                    {order.closedBy && order.closedBy.name !== order.user.name && (
+                      <>
+                        <span className="text-gray-600 text-xs">·</span>
+                        <span className="text-blue-400 text-xs">💰 {order.closedBy.name}</span>
+                      </>
+                    )}
                   </div>
                   <div className="text-right">
                     <span className="text-emerald-400 font-bold text-sm md:text-base">
