@@ -1,6 +1,14 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 
+async function logKitchenEvent(orderId: string, action: string, details: string) {
+  try {
+    await prisma.orderEvent.create({
+      data: { orderId, action, userId: 'kitchen', userName: 'Cocina', details },
+    });
+  } catch { /* never block */ }
+}
+
 export const kitchenService = {
   /**
    * Obtener todos los items que están en cocina (SENT o PREPARING)
@@ -72,6 +80,9 @@ export const kitchenService = {
       include: { product: { select: { name: true } } },
     });
 
+    // Log event
+    await logKitchenEvent(item.orderId, 'ITEM_PREPARING', `Preparando: ${updated.product.name}`);
+
     // Si todos los items de la orden están en PREPARING o más, actualizar la orden
     const orderItems = await prisma.orderItem.findMany({ where: { orderId: item.orderId } });
     const allPreparing = orderItems.every((oi) => ['PREPARING', 'READY', 'DELIVERED'].includes(oi.status));
@@ -97,6 +108,9 @@ export const kitchenService = {
       data: { status: 'READY' },
       include: { product: { select: { name: true } } },
     });
+
+    // Log event
+    await logKitchenEvent(item.orderId, 'ITEM_READY', `Listo: ${updated.product.name}`);
 
     // Si todos los items de la orden están READY o más, actualizar la orden
     const orderItems = await prisma.orderItem.findMany({ where: { orderId: item.orderId } });
@@ -124,6 +138,9 @@ export const kitchenService = {
       where: { id: orderId },
       data: { status: 'READY' },
     });
+
+    // Log event
+    await logKitchenEvent(orderId, 'ORDER_READY', 'Toda la orden lista para servir');
 
     return { success: true };
   },

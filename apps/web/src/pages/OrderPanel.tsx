@@ -50,6 +50,12 @@ export default function OrderPanel() {
   const [customerResults, setCustomerResults] = useState<{ id: string; firstName: string; lastName: string; loyaltyPoints: number }[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null);
 
+  // Discount state
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountType, setDiscountType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -74,6 +80,10 @@ export default function OrderPanel() {
     setSelectedCustomer(null);
     setCustomerSearch('');
     setCustomerResults([]);
+    setDiscountEnabled(false);
+    setDiscountType('PERCENT');
+    setDiscountAmount('');
+    setDiscountReason('');
   };
 
   const searchCustomers = async (query: string) => {
@@ -92,10 +102,30 @@ export default function OrderPanel() {
     setPayingId(payModal.id);
     setPayModal(null);
     try {
-      await apiClient(`/orders/${orderToPay.id}/pay`, 'PATCH', {
+      const payload: any = {
         method: selectedMethod,
         customerId: selectedCustomer?.id || null,
-      });
+      };
+
+      // Add discount if enabled
+      if (discountEnabled && discountAmount && parseFloat(discountAmount) > 0) {
+        payload.discount = {
+          amount: parseFloat(discountAmount),
+          type: discountType,
+          reason: discountReason || undefined,
+        };
+      }
+
+      await apiClient(`/orders/${orderToPay.id}/pay`, 'PATCH', payload);
+
+      // Calculate final amount for ticket
+      let finalTotal = orderToPay.total;
+      if (payload.discount) {
+        const disc = payload.discount.type === 'PERCENT'
+          ? orderToPay.total * (payload.discount.amount / 100)
+          : payload.discount.amount;
+        finalTotal = orderToPay.total - Math.min(disc, orderToPay.total);
+      }
 
       // Ofrecer imprimir ticket
       const shouldPrint = confirm('✅ Cobro exitoso. ¿Imprimir ticket?');
@@ -104,8 +134,8 @@ export default function OrderPanel() {
           const config = await apiClient('/config', 'GET');
           const subtotal = orderToPay.total;
           const taxRate = config.taxRate || 0.16;
-          const tax = subtotal * taxRate;
-          const total = subtotal + tax;
+          const tax = finalTotal * taxRate;
+          const total = finalTotal + tax;
 
           printTicket({
             ticketNumber: orderToPay.ticketNumber || 0,
@@ -272,6 +302,68 @@ export default function OrderPanel() {
                         </button>
                       ))}
                     </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Descuento (opcional) */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-gray-400 text-xs">Aplicar descuento:</p>
+                <button
+                  onClick={() => setDiscountEnabled(!discountEnabled)}
+                  className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    discountEnabled ? 'bg-amber-500/20 text-amber-400' : 'bg-gray-700 text-gray-400'
+                  }`}
+                >
+                  {discountEnabled ? '🏷️ Activo' : '➕ Agregar'}
+                </button>
+              </div>
+              {discountEnabled && (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex bg-gray-800 rounded-lg p-0.5 shrink-0">
+                      <button
+                        onClick={() => setDiscountType('PERCENT')}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium ${discountType === 'PERCENT' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                      >
+                        %
+                      </button>
+                      <button
+                        onClick={() => setDiscountType('FIXED')}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium ${discountType === 'FIXED' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                      >
+                        $
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      value={discountAmount}
+                      onChange={(e) => setDiscountAmount(e.target.value)}
+                      className="flex-1 bg-gray-800 text-white text-sm rounded-lg border border-gray-600 px-3 py-1.5 focus:border-amber-500 focus:outline-none"
+                      placeholder={discountType === 'PERCENT' ? '10' : '50'}
+                      min="0"
+                      max={discountType === 'PERCENT' ? '100' : undefined}
+                      step="1"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={discountReason}
+                    onChange={(e) => setDiscountReason(e.target.value)}
+                    className="w-full bg-gray-800 text-white text-sm rounded-lg border border-gray-600 px-3 py-1.5 focus:border-amber-500 focus:outline-none"
+                    placeholder="Razón: Cliente VIP, Promoción, Cortesía..."
+                  />
+                  {discountAmount && parseFloat(discountAmount) > 0 && (
+                    <p className="text-amber-400 text-xs">
+                      💰 Descuento: {discountType === 'PERCENT' ? `${discountAmount}%` : `$${discountAmount}`}
+                      {' → '}Cobro final: $
+                      {discountType === 'PERCENT'
+                        ? ((payModal?.total || 0) * (1 - parseFloat(discountAmount) / 100)).toFixed(2)
+                        : Math.max(0, (payModal?.total || 0) - parseFloat(discountAmount)).toFixed(2)
+                      }
+                    </p>
                   )}
                 </div>
               )}
