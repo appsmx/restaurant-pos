@@ -95,7 +95,7 @@ export default function OrderDetail({ orderId, onBack }: OrderDetailProps) {
     const fetchOrder = async () => {
       try {
         setLoading(true);
-        const data = await apiClient(`/orders/${orderId}`, 'GET');
+        const data = await apiClient(`/reports/order/${orderId}`, 'GET');
         setOrder(data);
       } catch (err) {
         setError('Error al cargar el detalle de la orden');

@@ -78,4 +78,41 @@ router.get('/daily', async (req: AuthRequest, res, next) => {
   }
 });
 
+// GET /api/reports/order/:id — detalle completo de una orden (para timeline)
+router.get('/order/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const { prisma } = require('../lib/prisma');
+
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        items: { include: { product: { select: { name: true, price: true } } } },
+        table: { select: { name: true } },
+        user: { select: { id: true, name: true, role: true } },
+        closedBy: { select: { id: true, name: true, role: true } },
+        payments: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Orden no encontrada' });
+    }
+
+    // Try to fetch events (table may not exist)
+    let events: any[] = [];
+    try {
+      events = await (prisma as any).orderEvent.findMany({
+        where: { orderId: req.params.id },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {
+      // OrderEvent table may not exist yet
+    }
+
+    res.json({ ...order, events });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
