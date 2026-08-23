@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
+import { printTicket } from '../lib/printTicket';
 
 interface OrderItem {
   id: string;
@@ -86,14 +87,51 @@ export default function OrderPanel() {
 
   const handleConfirmPay = async () => {
     if (!payModal) return;
+    const orderToPay = payModal;
 
     setPayingId(payModal.id);
     setPayModal(null);
     try {
-      await apiClient(`/orders/${payModal.id}/pay`, 'PATCH', {
+      await apiClient(`/orders/${orderToPay.id}/pay`, 'PATCH', {
         method: selectedMethod,
         customerId: selectedCustomer?.id || null,
       });
+
+      // Ofrecer imprimir ticket
+      const shouldPrint = confirm('✅ Cobro exitoso. ¿Imprimir ticket?');
+      if (shouldPrint) {
+        try {
+          const config = await apiClient('/config', 'GET');
+          const subtotal = orderToPay.total;
+          const taxRate = config.taxRate || 0.16;
+          const tax = subtotal * taxRate;
+          const total = subtotal + tax;
+
+          printTicket({
+            ticketNumber: orderToPay.ticketNumber || 0,
+            date: new Date().toLocaleDateString('es-MX'),
+            waiterName: orderToPay.user?.name || 'N/A',
+            tableName: orderToPay.table?.name || null,
+            items: orderToPay.items.map((i) => ({
+              name: i.product.name,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+            })),
+            subtotal,
+            taxRate,
+            tax,
+            total,
+            paymentMethod: selectedMethod,
+            restaurant: {
+              name: config.name,
+              address: config.address,
+              phone: config.phone,
+              rfc: config.rfc,
+            },
+          });
+        } catch { /* silently fail print */ }
+      }
+
       fetchOrders();
     } catch (err) {
       alert('Error al procesar el pago');

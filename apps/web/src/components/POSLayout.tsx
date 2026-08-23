@@ -11,9 +11,10 @@ import Employees from '../pages/Employees';
 import Kitchen from '../pages/Kitchen';
 import CashRegister from '../pages/CashRegister';
 import Customers from '../pages/Customers';
+import Settings from '../pages/Settings';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees' | 'kitchen' | 'cash' | 'customers';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'employees' | 'kitchen' | 'cash' | 'customers' | 'settings';
 
 export interface NavItem {
   view: View;
@@ -33,6 +34,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'history', label: 'Historial', icon: '📜', roles: ['ADMIN', 'MANAGER'] },
   { view: 'inventory', label: 'Inventario', icon: '📦', roles: ['ADMIN', 'MANAGER'] },
   { view: 'employees', label: 'Equipo', icon: '🔑', roles: ['ADMIN'] },
+  { view: 'settings', label: 'Config', icon: '⚙️', roles: ['ADMIN'] },
   { view: 'tips', label: 'Tips', icon: '💡' },
 ];
 
@@ -61,6 +63,7 @@ export default function POSLayout() {
       case 'history': return isAllowed(['ADMIN', 'MANAGER']) ? <History /> : <FloorPlan onViewChange={setActiveView} />;
       case 'inventory': return isAllowed(['ADMIN', 'MANAGER']) ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
       case 'employees': return isAllowed(['ADMIN']) ? <Employees /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'settings': return isAllowed(['ADMIN']) ? <Settings /> : <FloorPlan onViewChange={setActiveView} />;
     }
   };
 

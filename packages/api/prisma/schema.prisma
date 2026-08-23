@@ -334,3 +334,19 @@ model Customer {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
+
+
+
+// ==================== CONFIGURACIÓN DEL RESTAURANTE ====================
+
+model RestaurantConfig {
+  id          String   @id @default("main")
+  name        String   @default("Mi Restaurante")
+  address     String?
+  phone       String?
+  rfc         String?
+  taxRate     Float    @default(0.16)
+  currency    String   @default("MXN")
+  logoUrl     String?
+  updatedAt   DateTime @updatedAt
+}

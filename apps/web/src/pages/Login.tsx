@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { apiClient } from '../lib/apiClient';
 
 type LoginMode = 'pin' | 'credentials';
 
 export default function Login() {
   const [mode, setMode] = useState<LoginMode>('pin');
+  const [restaurantName, setRestaurantName] = useState('POS Restaurante');
+
+  useEffect(() => {
+    apiClient('/config', 'GET').then((config) => {
+      if (config?.name) setRestaurantName(config.name);
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
@@ -12,9 +20,9 @@ export default function Login() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mb-3">
-            P
+            {restaurantName[0]?.toUpperCase() || 'P'}
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-white">POS Restaurante</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-white">{restaurantName}</h1>
         </div>
 
         {mode === 'pin' ? (
