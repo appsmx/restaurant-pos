@@ -102,21 +102,23 @@ interface BottomNavProps {
 
 function BottomNav({ activeView, onViewChange, navItems }: BottomNavProps) {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 flex justify-around items-center py-2 px-1 z-50">
-      {navItems.map((item) => (
-        <button
-          key={item.view}
-          onClick={() => onViewChange(item.view)}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg min-w-[48px] transition-colors ${
-            activeView === item.view
-              ? 'text-blue-400'
-              : 'text-gray-500'
-          }`}
-        >
-          <span className="text-lg">{item.icon}</span>
-          <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
-        </button>
-      ))}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 z-50">
+      <div className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1">
+        {navItems.map((item) => (
+          <button
+            key={item.view}
+            onClick={() => onViewChange(item.view)}
+            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-lg min-w-[56px] shrink-0 transition-colors ${
+              activeView === item.view
+                ? 'text-blue-400 bg-blue-500/10'
+                : 'text-gray-500'
+            }`}
+          >
+            <span className="text-lg">{item.icon}</span>
+            <span className="text-[9px] mt-0.5 font-medium whitespace-nowrap">{item.label}</span>
+          </button>
+        ))}
+      </div>
     </nav>
   );
 }
