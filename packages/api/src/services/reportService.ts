@@ -52,6 +52,7 @@ export const reportService = {
     });
 
     const totalSales = closedOrders.reduce((sum, o) => sum + o.total, 0);
+    const totalTips = closedOrders.reduce((sum, o) => sum + o.payments.reduce((ps, p) => ps + (p.tip || 0), 0), 0);
     const totalOrders = closedOrders.length;
     const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
 
@@ -86,6 +87,7 @@ export const reportService = {
       from: range.from.toISOString(),
       to: range.to.toISOString(),
       totalSales,
+      totalTips,
       totalOrders,
       avgTicket: Math.round(avgTicket * 100) / 100,
       topProduct,

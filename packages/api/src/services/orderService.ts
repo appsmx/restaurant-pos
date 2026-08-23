@@ -6,11 +6,12 @@ import { inventoryService } from './inventoryService';
 
 async function logEvent(orderId: string, action: string, userId: string, userName: string, details?: string) {
   try {
-    await prisma.orderEvent.create({
+    await (prisma as any).orderEvent.create({
       data: { orderId, action, userId, userName, details: details || null },
     });
   } catch {
     // Never block main flow for audit logging
+    // OrderEvent table may not exist yet
   }
 }
 
@@ -136,7 +137,8 @@ export const orderService = {
     userId: string,
     method: string = 'CASH',
     customerId?: string,
-    discount?: { amount: number; type: 'PERCENT' | 'FIXED'; reason?: string }
+    discount?: { amount: number; type: 'PERCENT' | 'FIXED'; reason?: string },
+    tip?: number
   ) => {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -161,11 +163,14 @@ export const orderService = {
 
     const finalTotal = subtotal - discountAmount;
 
+    const tipAmount = tip && tip > 0 ? tip : 0;
+
     // 1. Create payment record
     await prisma.payment.create({
       data: {
         orderId,
         amount: finalTotal,
+        tip: tipAmount,
         method: method as any,
         status: 'COMPLETED',
         userId,
@@ -227,6 +232,9 @@ export const orderService = {
     if (discountAmount > 0) {
       payDetails += ` (Descuento: $${discountAmount.toFixed(2)} - ${discount?.reason || 'Sin razón'})`;
     }
+    if (tipAmount > 0) {
+      payDetails += ` + Propina: $${tipAmount.toFixed(2)}`;
+    }
     await logEvent(orderId, 'PAID', userId, user?.name || 'Cajero', payDetails);
 
     return closedOrder;
@@ -243,12 +251,23 @@ export const orderService = {
         table: { select: { name: true } },
         user: { select: { id: true, name: true, role: true } },
         closedBy: { select: { id: true, name: true, role: true } },
-        payments: { select: { method: true, amount: true, createdAt: true, user: { select: { name: true } } } },
-        events: { orderBy: { createdAt: 'asc' } },
+        payments: { select: { method: true, amount: true, tip: true, createdAt: true, user: { select: { name: true } } } },
       },
     });
 
     if (!order) throw new AppError('Orden no encontrada', 404);
-    return order;
+
+    // Try to fetch events separately (table may not exist yet)
+    let events: any[] = [];
+    try {
+      events = await (prisma as any).orderEvent.findMany({
+        where: { orderId },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {
+      // OrderEvent table doesn't exist yet — return empty
+    }
+
+    return { ...order, events };
   },
 };

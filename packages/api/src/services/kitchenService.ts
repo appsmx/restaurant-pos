@@ -3,7 +3,7 @@ import { AppError } from '../lib/errors';
 
 async function logKitchenEvent(orderId: string, action: string, details: string) {
   try {
-    await prisma.orderEvent.create({
+    await (prisma as any).orderEvent.create({
       data: { orderId, action, userId: 'kitchen', userName: 'Cocina', details },
     });
   } catch { /* never block */ }
