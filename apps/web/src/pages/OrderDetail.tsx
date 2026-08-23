@@ -24,6 +24,7 @@ interface OrderItemDetail {
 interface PaymentDetail {
   method: string;
   amount: number;
+  tip: number;
   createdAt: string;
   user: { name: string };
 }
@@ -234,12 +235,20 @@ export default function OrderDetail({ orderId, onBack }: OrderDetailProps) {
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
               <h2 className="text-white font-semibold text-sm mb-3">💳 Pago</h2>
               {order.payments.map((p, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">{METHOD_LABELS[p.method] || p.method}</span>
-                  <div className="text-right">
-                    <span className="text-emerald-400 font-bold text-sm">${p.amount.toFixed(2)}</span>
-                    <p className="text-gray-600 text-xs">{formatTime(p.createdAt)} · {p.user.name}</p>
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-sm">{METHOD_LABELS[p.method] || p.method}</span>
+                    <div className="text-right">
+                      <span className="text-emerald-400 font-bold text-sm">${p.amount.toFixed(2)}</span>
+                      <p className="text-gray-600 text-xs">{formatTime(p.createdAt)} · {p.user.name}</p>
+                    </div>
                   </div>
+                  {p.tip > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-pink-400 text-sm">💝 Propina</span>
+                      <span className="text-pink-400 font-bold text-sm">${p.tip.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

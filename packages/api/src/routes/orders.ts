@@ -16,6 +16,7 @@ const payOrderSchema = z.object({
     type: z.enum(['PERCENT', 'FIXED']),
     reason: z.string().optional(),
   }).optional().nullable(),
+  tip: z.number().min(0).optional().nullable(),
 });
 
 router.post('/', validate(createOrderSchema), async (req: AuthRequest, res, next) => {
@@ -61,8 +62,8 @@ router.get('/active', async (req, res, next) => {
 router.patch('/:id/pay', validate(payOrderSchema), async (req: AuthRequest, res, next) => {
   try {
     const { id } = req.params;
-    const { method, customerId, discount } = req.body;
-    const order = await orderService.closeOrder(id, req.userId!, method, customerId || undefined, discount || undefined);
+    const { method, customerId, discount, tip } = req.body;
+    const order = await orderService.closeOrder(id, req.userId!, method, customerId || undefined, discount || undefined, tip || undefined);
     res.json(order);
   } catch (error) {
     next(error);

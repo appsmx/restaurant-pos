@@ -206,6 +206,7 @@ model Payment {
   id        String       @id @default(uuid())
   orderId   String
   amount    Float
+  tip       Float        @default(0)
   method    PaymentMethod
   status    PaymentStatus @default(COMPLETED)
   userId    String

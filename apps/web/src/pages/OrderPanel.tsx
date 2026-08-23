@@ -56,6 +56,9 @@ export default function OrderPanel() {
   const [discountAmount, setDiscountAmount] = useState('');
   const [discountReason, setDiscountReason] = useState('');
 
+  // Tip state
+  const [tipAmount, setTipAmount] = useState('');
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -84,6 +87,7 @@ export default function OrderPanel() {
     setDiscountType('PERCENT');
     setDiscountAmount('');
     setDiscountReason('');
+    setTipAmount('');
   };
 
   const searchCustomers = async (query: string) => {
@@ -114,6 +118,11 @@ export default function OrderPanel() {
           type: discountType,
           reason: discountReason || undefined,
         };
+      }
+
+      // Add tip if provided
+      if (tipAmount && parseFloat(tipAmount) > 0) {
+        payload.tip = parseFloat(tipAmount);
       }
 
       await apiClient(`/orders/${orderToPay.id}/pay`, 'PATCH', payload);
@@ -366,6 +375,41 @@ export default function OrderPanel() {
                     </p>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* Propina (opcional) */}
+            <div className="mb-4">
+              <p className="text-gray-400 text-xs mb-2">💝 Propina (opcional):</p>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  {[0, 10, 15, 20].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setTipAmount(pct === 0 ? '' : String(Math.round((payModal?.total || 0) * pct / 100)))}
+                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        tipAmount === String(Math.round((payModal?.total || 0) * pct / 100)) && pct > 0
+                          ? 'bg-pink-600 text-white'
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      }`}
+                    >
+                      {pct === 0 ? 'Sin' : `${pct}%`}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  value={tipAmount}
+                  onChange={(e) => setTipAmount(e.target.value)}
+                  className="flex-1 bg-gray-800 text-white text-sm rounded-lg border border-gray-600 px-3 py-1.5 focus:border-pink-500 focus:outline-none"
+                  placeholder="$ Monto"
+                  min="0"
+                  step="5"
+                />
+              </div>
+              {tipAmount && parseFloat(tipAmount) > 0 && (
+                <p className="text-pink-400 text-xs mt-1">💝 Propina: ${parseFloat(tipAmount).toFixed(2)}</p>
               )}
             </div>
 

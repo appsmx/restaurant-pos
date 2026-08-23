@@ -137,7 +137,8 @@ export const orderService = {
     userId: string,
     method: string = 'CASH',
     customerId?: string,
-    discount?: { amount: number; type: 'PERCENT' | 'FIXED'; reason?: string }
+    discount?: { amount: number; type: 'PERCENT' | 'FIXED'; reason?: string },
+    tip?: number
   ) => {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -162,11 +163,14 @@ export const orderService = {
 
     const finalTotal = subtotal - discountAmount;
 
+    const tipAmount = tip && tip > 0 ? tip : 0;
+
     // 1. Create payment record
     await prisma.payment.create({
       data: {
         orderId,
         amount: finalTotal,
+        tip: tipAmount,
         method: method as any,
         status: 'COMPLETED',
         userId,
@@ -228,6 +232,9 @@ export const orderService = {
     if (discountAmount > 0) {
       payDetails += ` (Descuento: $${discountAmount.toFixed(2)} - ${discount?.reason || 'Sin razón'})`;
     }
+    if (tipAmount > 0) {
+      payDetails += ` + Propina: $${tipAmount.toFixed(2)}`;
+    }
     await logEvent(orderId, 'PAID', userId, user?.name || 'Cajero', payDetails);
 
     return closedOrder;
@@ -244,7 +251,7 @@ export const orderService = {
         table: { select: { name: true } },
         user: { select: { id: true, name: true, role: true } },
         closedBy: { select: { id: true, name: true, role: true } },
-        payments: { select: { method: true, amount: true, createdAt: true, user: { select: { name: true } } } },
+        payments: { select: { method: true, amount: true, tip: true, createdAt: true, user: { select: { name: true } } } },
       },
     });
 

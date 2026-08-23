@@ -7,6 +7,7 @@ interface Summary {
   from: string;
   to: string;
   totalSales: number;
+  totalTips: number;
   totalOrders: number;
   avgTicket: number;
   topProduct: { name: string; quantity: number; revenue: number } | null;
@@ -143,6 +144,18 @@ export default function Dashboard() {
           color="amber"
         />
       </div>
+
+      {/* Tips KPI (only show if there are tips) */}
+      {summary.totalTips > 0 && (
+        <div className="mb-6">
+          <div className="inline-flex items-center gap-2 bg-pink-500/10 border border-pink-500/30 rounded-xl px-4 py-2">
+            <span className="text-lg">💝</span>
+            <span className="text-pink-400 text-sm font-medium">
+              Propinas del período: <span className="font-bold">${summary.totalTips.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Charts — Daily sales + Payment pie */}
       {(dailyData.length > 0 || Object.keys(summary.paymentMethods).length > 0) && (
