@@ -20,6 +20,18 @@ interface TicketData {
   };
 }
 
+/**
+ * Datos para la comanda de cocina
+ */
+interface KitchenTicketData {
+  ticketNumber: number;
+  tableName: string | null;
+  orderType: string;
+  waiterName: string;
+  items: { name: string; quantity: number; notes?: string }[];
+  createdAt: string;
+}
+
 const METHOD_LABELS: Record<string, string> = {
   CASH: 'Efectivo',
   CARD: 'Tarjeta',
@@ -103,6 +115,85 @@ export function printTicket(data: TicketData) {
 </html>`;
 
   const printWindow = window.open('', '_blank', 'width=350,height=600');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+}
+
+
+
+/**
+ * Genera e imprime una comanda de cocina en una ventana nueva
+ * Formato más grande y claro para que el cocinero lea rápido
+ */
+export function printKitchenTicket(data: KitchenTicketData) {
+  const time = new Date(data.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  const orderTypeLabel = data.orderType === 'TAKEAWAY' ? '📦 PARA LLEVAR' : data.orderType === 'DELIVERY' ? '🛵 DELIVERY' : '';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Comanda #${data.ticketNumber}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; font-size: 14px; width: 80mm; padding: 5mm; }
+    .center { text-align: center; }
+    .bold { font-weight: bold; }
+    .big { font-size: 18px; font-weight: bold; }
+    .separator { border-top: 2px dashed #000; margin: 8px 0; }
+    .separator-thin { border-top: 1px dashed #000; margin: 5px 0; }
+    .item { margin: 6px 0; }
+    .item-name { font-size: 16px; font-weight: bold; }
+    .item-qty { font-size: 20px; font-weight: bold; display: inline-block; min-width: 30px; }
+    .item-notes { font-size: 12px; color: #666; margin-left: 30px; font-style: italic; }
+    .header { margin-bottom: 5px; }
+    .takeaway { font-size: 16px; font-weight: bold; border: 2px solid #000; padding: 3px 8px; display: inline-block; margin-top: 5px; }
+    @media print {
+      body { width: 80mm; margin: 0; padding: 3mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="center header">
+    <p class="big">🍳 COMANDA</p>
+    <p class="big">#${String(data.ticketNumber).padStart(3, '0')}</p>
+  </div>
+  
+  <div class="separator"></div>
+  
+  <div>
+    <p><strong>${data.tableName ? `🍽️ ${data.tableName}` : '📦 Para llevar'}</strong></p>
+    <p>Mesero: ${data.waiterName} · ${time}</p>
+    ${orderTypeLabel ? `<p class="takeaway">${orderTypeLabel}</p>` : ''}
+  </div>
+  
+  <div class="separator"></div>
+  
+  <div>
+    ${data.items.map(item => `
+      <div class="item">
+        <span class="item-qty">x${item.quantity}</span>
+        <span class="item-name">${item.name}</span>
+        ${item.notes ? `<p class="item-notes">⚠️ ${item.notes}</p>` : ''}
+      </div>
+      <div class="separator-thin"></div>
+    `).join('')}
+  </div>
+  
+  <div class="center" style="margin-top: 10px;">
+    <p style="font-size: 12px; color: #666;">${data.items.length} platillo${data.items.length !== 1 ? 's' : ''} · ${time}</p>
+  </div>
+  
+  <script>
+    window.onload = function() { window.print(); }
+  </script>
+</body>
+</html>`;
+
+  const printWindow = window.open('', '_blank', 'width=350,height=500');
   if (printWindow) {
     printWindow.document.write(html);
     printWindow.document.close();
