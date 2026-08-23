@@ -1,6 +1,7 @@
 import { useAuthStore } from './stores/authStore';
 import Login from './pages/Login';
 import POSLayout from './components/POSLayout';
+import NotificationProvider from './components/NotificationProvider';
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
@@ -9,5 +10,10 @@ export default function App() {
     return <Login />;
   }
 
-  return <POSLayout />;
+  return (
+    <>
+      <NotificationProvider />
+      <POSLayout />
+    </>
+  );
 }

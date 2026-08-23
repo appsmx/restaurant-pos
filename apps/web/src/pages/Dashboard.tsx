@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface Summary {
   period: string;
@@ -44,11 +45,14 @@ const METHOD_LABELS: Record<string, string> = {
   OTHER: '🔄 Otro',
 };
 
+const PIE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
+
 export default function Dashboard() {
   const [period, setPeriod] = useState<Period>('today');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [employees, setEmployees] = useState<EmployeeSales[]>([]);
   const [products, setProducts] = useState<ProductSales[]>([]);
+  const [dailyData, setDailyData] = useState<{ date: string; sales: number; orders: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -64,6 +68,11 @@ export default function Dashboard() {
       setSummary(summaryData);
       setEmployees(employeeData);
       setProducts(productData);
+      // Fetch daily chart (always last 7 days regardless of period)
+      try {
+        const daily = await apiClient('/reports/daily', 'GET');
+        setDailyData(daily);
+      } catch { /* chart data optional */ }
     } catch (err) {
       setError('Error al cargar los reportes. Verifica que tengas permisos de administrador.');
     } finally {
@@ -129,6 +138,60 @@ export default function Dashboard() {
           color="amber"
         />
       </div>
+
+      {/* Charts — Daily sales + Payment pie */}
+      {(dailyData.length > 0 || Object.keys(summary.paymentMethods).length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
+          {/* Bar chart: ventas por día */}
+          {dailyData.length > 0 && (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <h2 className="text-white font-semibold text-sm mb-4">📈 Ventas últimos 7 días</h2>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={dailyData}>
+                  <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '12px' }}
+                    labelStyle={{ color: '#fff' }}
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
+                  />
+                  <Bar dataKey="sales" fill="#10b981" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Pie chart: métodos de pago */}
+          {Object.keys(summary.paymentMethods).length > 0 && (
+            <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <h2 className="text-white font-semibold text-sm mb-4">💳 Métodos de pago</h2>
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(summary.paymentMethods).map(([method, data]) => ({
+                        name: METHOD_LABELS[method] || method,
+                        value: data.total,
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {Object.keys(summary.paymentMethods).map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Two columns on desktop: Employees + Products */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

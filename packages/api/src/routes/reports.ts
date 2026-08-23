@@ -68,4 +68,14 @@ router.get('/history', async (req: AuthRequest, res, next) => {
   }
 });
 
+// GET /api/reports/daily — ventas por día (últimos 7 días, para gráficas)
+router.get('/daily', async (req: AuthRequest, res, next) => {
+  try {
+    const data = await reportService.getDailyBreakdown();
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

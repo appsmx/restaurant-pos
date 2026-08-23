@@ -205,4 +205,34 @@ export const reportService = {
       },
     };
   },
+
+  /**
+   * Ventas por día (para gráfica de barras) — últimos 7 días
+   */
+  getDailyBreakdown: async () => {
+    const days: { date: string; sales: number; orders: number }[] = [];
+    const now = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 0, 0, 0, 0);
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 23, 59, 59, 999);
+
+      const closedOrders = await prisma.order.findMany({
+        where: {
+          status: 'CLOSED',
+          closedAt: { gte: dayStart, lte: dayEnd },
+        },
+      });
+
+      const totalSales = closedOrders.reduce((sum, o) => sum + o.total, 0);
+
+      days.push({
+        date: dayStart.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
+        sales: Math.round(totalSales * 100) / 100,
+        orders: closedOrders.length,
+      });
+    }
+
+    return days;
+  },
 };
