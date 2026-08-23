@@ -2,8 +2,26 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { inventoryService } from './inventoryService';
 
+// ==================== HELPER: Log order event ====================
+
+async function logEvent(orderId: string, action: string, userId: string, userName: string, details?: string) {
+  try {
+    await prisma.orderEvent.create({
+      data: { orderId, action, userId, userName, details: details || null },
+    });
+  } catch {
+    // Never block main flow for audit logging
+  }
+}
+
+// ==================== SERVICE ====================
+
 export const orderService = {
   createOrder: async (userId: string, tableId?: string, type: string = 'DINE_IN') => {
+    // Get user name for events
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const userName = user?.name || 'Sistema';
+
     // Generate next ticket number (max + 1)
     const lastOrder = await prisma.order.findFirst({ orderBy: { ticketNumber: 'desc' } });
     const ticketNumber = (lastOrder?.ticketNumber || 0) + 1;
@@ -16,7 +34,7 @@ export const orderService = {
         status: 'OPEN',
         ticketNumber,
       },
-      include: { items: true }
+      include: { items: true, table: true }
     });
 
     if (tableId) {
@@ -26,10 +44,14 @@ export const orderService = {
       });
     }
 
+    // Log event
+    const tableInfo = order.table ? `Mesa: ${order.table.name}` : 'Para llevar';
+    await logEvent(order.id, 'CREATED', userId, userName, `Orden #${ticketNumber} creada. ${tableInfo}`);
+
     return order;
   },
 
-  addOrderItem: async (orderId: string, productId: string, quantity: number, notes?: string) => {
+  addOrderItem: async (orderId: string, productId: string, quantity: number, notes?: string, userId?: string) => {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) throw new AppError('Producto no encontrado', 404);
 
@@ -44,25 +66,55 @@ export const orderService = {
       }
     });
 
+    // Update subtotal and total
+    const newSubtotal = await prisma.orderItem.aggregate({
+      where: { orderId },
+      _sum: { unitPrice: true },
+    });
+
+    // Recalculate total from all items
+    const allItems = await prisma.orderItem.findMany({ where: { orderId } });
+    const subtotal = allItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+
     await prisma.order.update({
       where: { id: orderId },
-      data: { total: { increment: product.price * quantity } }
+      data: { subtotal, total: subtotal }
     });
+
+    // Log event
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      await logEvent(orderId, 'ITEM_ADDED', userId, user?.name || 'Sistema', `${quantity}x ${product.name}${notes ? ` (${notes})` : ''}`);
+    }
 
     return orderItem;
   },
 
-  sendToKitchen: async (orderId: string) => {
+  sendToKitchen: async (orderId: string, userId?: string) => {
+    const pendingItems = await prisma.orderItem.findMany({
+      where: { orderId, status: 'PENDING' },
+      include: { product: { select: { name: true } } },
+    });
+
     await prisma.orderItem.updateMany({
       where: { orderId, status: 'PENDING' },
       data: { status: 'SENT' }
     });
 
-    return prisma.order.update({
+    const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status: 'SENT' },
+      data: { status: 'SENT', sentAt: new Date() },
       include: { items: true }
     });
+
+    // Log event
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      const itemsSummary = pendingItems.map((i) => `${i.quantity}x ${i.product.name}`).join(', ');
+      await logEvent(orderId, 'SENT_TO_KITCHEN', userId, user?.name || 'Sistema', `Enviado a cocina: ${itemsSummary}`);
+    }
+
+    return updatedOrder;
   },
 
   getActiveOrders: async () => {
@@ -79,54 +131,82 @@ export const orderService = {
     });
   },
 
-  // --- ESTA ES LA NUEVA ---
-  closeOrder: async (orderId: string, userId: string, method: string = 'CASH', customerId?: string) => {
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
+  closeOrder: async (
+    orderId: string,
+    userId: string,
+    method: string = 'CASH',
+    customerId?: string,
+    discount?: { amount: number; type: 'PERCENT' | 'FIXED'; reason?: string }
+  ) => {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
     if (!order) throw new AppError('Orden no encontrada', 404);
     if (order.status === 'CLOSED') throw new AppError('La orden ya está cerrada', 400);
 
-    // 1. Crear el registro de pago
+    // Calculate final total with discount
+    const subtotal = order.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+    let discountAmount = 0;
+
+    if (discount && discount.amount > 0) {
+      if (discount.type === 'PERCENT') {
+        discountAmount = subtotal * (discount.amount / 100);
+      } else {
+        discountAmount = discount.amount;
+      }
+      // Don't allow discount bigger than subtotal
+      discountAmount = Math.min(discountAmount, subtotal);
+    }
+
+    const finalTotal = subtotal - discountAmount;
+
+    // 1. Create payment record
     await prisma.payment.create({
       data: {
         orderId,
-        amount: order.total,
+        amount: finalTotal,
         method: method as any,
         status: 'COMPLETED',
         userId,
       },
     });
 
-    // 2. Cambiar estado a CLOSED, registrar timestamp, cajero y cliente (si se asignó)
+    // 2. Close the order
     const closedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
         status: 'CLOSED',
         closedAt: new Date(),
         closedById: userId,
+        subtotal,
+        total: finalTotal,
+        discount: discountAmount,
+        discountType: discount?.type || null,
+        discountReason: discount?.reason || null,
         ...(customerId && { customerId }),
       },
       include: { items: true, table: true, payments: true }
     });
 
-    // 3. Si se asignó un cliente, registrar la visita + puntos de lealtad
+    // 3. Customer loyalty
     if (customerId) {
       try {
-        const pointsEarned = Math.floor(order.total / 10);
+        const pointsEarned = Math.floor(finalTotal / 10);
         await prisma.customer.update({
           where: { id: customerId },
           data: {
             totalVisits: { increment: 1 },
-            totalSpent: { increment: order.total },
+            totalSpent: { increment: finalTotal },
             loyaltyPoints: { increment: pointsEarned },
           },
         });
       } catch (err) {
-        // No bloquear el cobro si falla la actualización del cliente
         console.warn('No se pudo actualizar puntos del cliente:', err);
       }
     }
 
-    // 4. Si tenía mesa, liberarla (ponerla en AVAILABLE)
+    // 4. Release table
     if (order.tableId) {
       await prisma.table.update({
         where: { id: order.tableId },
@@ -134,15 +214,41 @@ export const orderService = {
       });
     }
 
-    // 4. Descontar stock de ingredientes automáticamente
+    // 5. Deduct stock
     try {
       await inventoryService.deductStockForOrder(orderId, userId);
     } catch (err) {
-      // No bloquear el cierre de la orden si falla el descuento de stock
-      // (puede que no haya recetas configuradas aún)
       console.warn('Advertencia: No se pudo descontar stock para orden', orderId, err);
     }
 
+    // 6. Log event
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    let payDetails = `Cobrado $${finalTotal.toFixed(2)} con ${method}`;
+    if (discountAmount > 0) {
+      payDetails += ` (Descuento: $${discountAmount.toFixed(2)} - ${discount?.reason || 'Sin razón'})`;
+    }
+    await logEvent(orderId, 'PAID', userId, user?.name || 'Cajero', payDetails);
+
     return closedOrder;
-  }
+  },
+
+  /**
+   * Get full order details with timeline events
+   */
+  getOrderDetail: async (orderId: string) => {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: { include: { product: { select: { name: true, price: true } } } },
+        table: { select: { name: true } },
+        user: { select: { id: true, name: true, role: true } },
+        closedBy: { select: { id: true, name: true, role: true } },
+        payments: { select: { method: true, amount: true, createdAt: true, user: { select: { name: true } } } },
+        events: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+
+    if (!order) throw new AppError('Orden no encontrada', 404);
+    return order;
+  },
 };

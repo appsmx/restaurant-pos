@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
+import OrderDetail from './OrderDetail';
 
 interface OrderHistoryItem {
   id: string;
@@ -34,6 +35,7 @@ export default function History() {
   const [error, setError] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const fetchHistory = async (page: number = 1) => {
     try {
@@ -79,6 +81,11 @@ export default function History() {
 
   return (
     <div>
+      {/* Show OrderDetail if an order is selected */}
+      {selectedOrderId ? (
+        <OrderDetail orderId={selectedOrderId} onBack={() => setSelectedOrderId(null)} />
+      ) : (
+      <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <h1 className="text-xl md:text-2xl font-bold">📜 Historial de Ventas</h1>
@@ -142,7 +149,7 @@ export default function History() {
           {/* Orders list */}
           <div className="space-y-3">
             {orders.map((order) => (
-              <div key={order.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+              <div key={order.id} onClick={() => setSelectedOrderId(order.id)} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden cursor-pointer hover:border-blue-500/50 transition-colors">
                 {/* Order header */}
                 <div className="px-3 md:px-4 py-2.5 flex items-center justify-between border-b border-gray-700/50">
                   <div className="flex items-center gap-2">
@@ -187,6 +194,9 @@ export default function History() {
                     <span className="text-xs text-gray-500">
                       🕐 {formatTime(order.closedAt)}
                     </span>
+                    <span className="text-xs text-blue-400 hidden sm:inline">
+                      Ver detalle →
+                    </span>
                   </div>
                 </div>
               </div>
@@ -216,6 +226,8 @@ export default function History() {
             </div>
           )}
         </>
+      )}
+      </>
       )}
     </div>
   );
