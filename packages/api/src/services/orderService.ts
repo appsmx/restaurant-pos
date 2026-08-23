@@ -6,11 +6,12 @@ import { inventoryService } from './inventoryService';
 
 async function logEvent(orderId: string, action: string, userId: string, userName: string, details?: string) {
   try {
-    await prisma.orderEvent.create({
+    await (prisma as any).orderEvent.create({
       data: { orderId, action, userId, userName, details: details || null },
     });
   } catch {
     // Never block main flow for audit logging
+    // OrderEvent table may not exist yet
   }
 }
 
@@ -244,11 +245,22 @@ export const orderService = {
         user: { select: { id: true, name: true, role: true } },
         closedBy: { select: { id: true, name: true, role: true } },
         payments: { select: { method: true, amount: true, createdAt: true, user: { select: { name: true } } } },
-        events: { orderBy: { createdAt: 'asc' } },
       },
     });
 
     if (!order) throw new AppError('Orden no encontrada', 404);
-    return order;
+
+    // Try to fetch events separately (table may not exist yet)
+    let events: any[] = [];
+    try {
+      events = await (prisma as any).orderEvent.findMany({
+        where: { orderId },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {
+      // OrderEvent table doesn't exist yet — return empty
+    }
+
+    return { ...order, events };
   },
 };
