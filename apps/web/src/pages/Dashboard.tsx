@@ -59,6 +59,7 @@ export default function Dashboard() {
   const [employees, setEmployees] = useState<EmployeeReport>({ creators: [], cashiers: [] });
   const [products, setProducts] = useState<ProductSales[]>([]);
   const [dailyData, setDailyData] = useState<{ date: string; sales: number; orders: number }[]>([]);
+  const [stockAlerts, setStockAlerts] = useState<{ id: string; name: string; stock: number; unit: string; severity: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -79,6 +80,11 @@ export default function Dashboard() {
         const daily = await apiClient('/reports/daily', 'GET');
         setDailyData(daily);
       } catch { /* chart data optional */ }
+      // Fetch stock alerts
+      try {
+        const alerts = await apiClient('/inventory/alerts', 'GET');
+        setStockAlerts(alerts);
+      } catch { /* alerts optional */ }
     } catch (err) {
       setError('Error al cargar los reportes. Verifica que tengas permisos de administrador.');
     } finally {
@@ -115,6 +121,30 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* Stock Alerts */}
+      {stockAlerts.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 md:p-4 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-red-400 text-sm font-medium">🚨 Alerta de stock bajo ({stockAlerts.length} ingredientes)</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {stockAlerts.slice(0, 6).map((alert) => (
+              <span
+                key={alert.id}
+                className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                  alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                }`}
+              >
+                {alert.name}: {alert.stock} {alert.unit}
+              </span>
+            ))}
+            {stockAlerts.length > 6 && (
+              <span className="text-gray-500 text-xs py-1">+{stockAlerts.length - 6} más</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">

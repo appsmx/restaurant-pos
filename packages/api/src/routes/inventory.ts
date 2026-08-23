@@ -156,4 +156,15 @@ router.delete('/recipes/items/:recipeIngredientId', async (req, res, next) => {
   }
 });
 
+// GET /api/inventory/alerts — ingredientes con stock bajo
+router.get('/alerts', async (req, res, next) => {
+  try {
+    const threshold = req.query.threshold ? parseFloat(req.query.threshold as string) : 10;
+    const alerts = await inventoryService.getLowStockAlerts(threshold);
+    res.json(alerts);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

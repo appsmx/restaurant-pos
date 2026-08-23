@@ -78,4 +78,112 @@ router.get('/daily', async (req: AuthRequest, res, next) => {
   }
 });
 
+// GET /api/reports/export?period=month&from=&to= — export ventas a CSV
+router.get('/export', async (req: AuthRequest, res, next) => {
+  try {
+    const { period, from, to } = req.query;
+    const { prisma } = require('../lib/prisma');
+
+    // Reuse getDateRange logic
+    const now = new Date();
+    let start: Date;
+    let end: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    switch (period || 'month') {
+      case 'today':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        break;
+      case 'week':
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset, 0, 0, 0, 0);
+        break;
+      case 'month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        break;
+      case 'custom':
+        start = from ? new Date(from as string) : new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        end = to ? new Date((to as string) + 'T23:59:59.999Z') : end;
+        break;
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    }
+
+    const orders = await prisma.order.findMany({
+      where: { status: 'CLOSED', closedAt: { gte: start, lte: end } },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+        table: { select: { name: true } },
+        user: { select: { name: true } },
+        closedBy: { select: { name: true } },
+        payments: true,
+      },
+      orderBy: { closedAt: 'asc' },
+    });
+
+    // Build CSV
+    const header = 'Ticket,Fecha,Hora,Mesa,Mesero,Cajero,Productos,Subtotal,Descuento,Total,Método,Propina\n';
+    const rows = orders.map((o: any) => {
+      const fecha = o.closedAt ? new Date(o.closedAt).toLocaleDateString('es-MX') : '';
+      const hora = o.closedAt ? new Date(o.closedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '';
+      const mesa = o.table?.name || 'Para llevar';
+      const mesero = o.user?.name || '';
+      const cajero = o.closedBy?.name || mesero;
+      const productos = o.items.map((i: any) => `${i.quantity}x ${i.product.name}`).join(' | ');
+      const subtotal = (o.subtotal || o.total + (o.discount || 0)).toFixed(2);
+      const descuento = (o.discount || 0).toFixed(2);
+      const total = o.total.toFixed(2);
+      const metodo = o.payments.length > 0 ? o.payments[0].method : '';
+      const propina = o.payments.reduce((s: number, p: any) => s + (p.tip || 0), 0).toFixed(2);
+      return `${o.ticketNumber},"${fecha}","${hora}","${mesa}","${mesero}","${cajero}","${productos}",${subtotal},${descuento},${total},${metodo},${propina}`;
+    }).join('\n');
+
+    const csv = header + rows;
+    const filename = `ventas_${(period || 'month')}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('\uFEFF' + csv); // BOM for Excel UTF-8 support
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/reports/order/:id — detalle completo de una orden (para timeline)
+router.get('/order/:id', async (req: AuthRequest, res, next) => {
+  try {
+    const { prisma } = require('../lib/prisma');
+
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        items: { include: { product: { select: { name: true, price: true } } } },
+        table: { select: { name: true } },
+        user: { select: { id: true, name: true, role: true } },
+        closedBy: { select: { id: true, name: true, role: true } },
+        payments: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Orden no encontrada' });
+    }
+
+    // Try to fetch events (table may not exist)
+    let events: any[] = [];
+    try {
+      events = await (prisma as any).orderEvent.findMany({
+        where: { orderId: req.params.id },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {
+      // OrderEvent table may not exist yet
+    }
+
+    res.json({ ...order, events });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

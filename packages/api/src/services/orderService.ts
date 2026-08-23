@@ -270,4 +270,67 @@ export const orderService = {
 
     return { ...order, events };
   },
+
+  /**
+   * Split payment — register a partial payment for an order.
+   * When the sum of all payments >= order total, auto-close the order.
+   */
+  splitPay: async (orderId: string, userId: string, method: string, amount: number, tip: number = 0, label?: string) => {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: true },
+    });
+    if (!order) throw new AppError('Orden no encontrada', 404);
+    if (order.status === 'CLOSED') throw new AppError('La orden ya está cerrada', 400);
+
+    // Create the partial payment
+    await prisma.payment.create({
+      data: {
+        orderId,
+        amount,
+        tip,
+        method: method as any,
+        status: 'COMPLETED',
+        userId,
+      },
+    });
+
+    // Calculate total paid so far
+    const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0) + amount;
+    const remaining = order.total - totalPaid;
+
+    // Log event
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const eventDetails = `Pago parcial $${amount.toFixed(2)} (${method})${label ? ` — ${label}` : ''}. Restante: $${Math.max(0, remaining).toFixed(2)}`;
+    await logEvent(orderId, 'PAID', userId, user?.name || 'Cajero', eventDetails);
+
+    // If fully paid, close the order
+    if (remaining <= 0.01) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'CLOSED',
+          closedAt: new Date(),
+          closedById: userId,
+        },
+      });
+
+      // Release table
+      if (order.tableId) {
+        await prisma.table.update({
+          where: { id: order.tableId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      // Deduct stock
+      try {
+        await inventoryService.deductStockForOrder(orderId, userId);
+      } catch { /* graceful */ }
+
+      return { status: 'CLOSED', totalPaid, remaining: 0, message: 'Orden cerrada — cuenta saldada' };
+    }
+
+    return { status: 'PARTIAL', totalPaid, remaining: Math.max(0, remaining), message: `Faltan $${remaining.toFixed(2)} por cobrar` };
+  },
 };
