@@ -89,9 +89,18 @@ export default function History() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <h1 className="text-xl md:text-2xl font-bold">📜 Historial de Ventas</h1>
-        <span className="text-gray-500 text-xs md:text-sm">
-          {pagination.total} {pagination.total === 1 ? 'orden' : 'órdenes'} encontradas
-        </span>
+        <div className="flex items-center gap-2">
+          <a
+            href={`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/reports/export?period=custom${fromDate ? `&from=${fromDate}` : ''}${toDate ? `&to=${toDate}` : ''}`}
+            target="_blank"
+            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl transition-colors"
+          >
+            📥 Exportar Excel
+          </a>
+          <span className="text-gray-500 text-xs md:text-sm">
+            {pagination.total} {pagination.total === 1 ? 'orden' : 'órdenes'} encontradas
+          </span>
+        </div>
       </div>
 
       {/* Filters */}

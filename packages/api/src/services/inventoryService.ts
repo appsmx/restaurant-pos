@@ -191,4 +191,28 @@ export const inventoryService = {
 
     return deductions;
   },
+
+  // ==================== ALERTAS DE STOCK BAJO ====================
+
+  /**
+   * Obtener ingredientes con stock por debajo del umbral
+   */
+  getLowStockAlerts: async (threshold: number = 10) => {
+    const ingredients = await prisma.ingredient.findMany({
+      where: { stock: { lte: threshold } },
+      orderBy: { stock: 'asc' },
+      include: {
+        _count: { select: { recipes: true } },
+      },
+    });
+
+    return ingredients.map((i) => ({
+      id: i.id,
+      name: i.name,
+      stock: i.stock,
+      unit: i.unit,
+      recipesCount: i._count.recipes,
+      severity: i.stock <= 3 ? 'CRITICAL' : i.stock <= threshold ? 'LOW' : 'OK',
+    }));
+  },
 };

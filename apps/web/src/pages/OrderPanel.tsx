@@ -59,6 +59,34 @@ export default function OrderPanel() {
   // Tip state
   const [tipAmount, setTipAmount] = useState('');
 
+  // Split payment state
+  const [splitOrder, setSplitOrder] = useState<Order | null>(null);
+  const [splitParts, setSplitParts] = useState(2);
+  const [splitPayments, setSplitPayments] = useState<{ amount: number; method: string; label: string }[]>([]);
+  const [splitAmount, setSplitAmount] = useState('');
+  const [splitMethod, setSplitMethod] = useState<PaymentMethod>('CASH');
+  const [splitLabel, setSplitLabel] = useState('');
+
+  const handleSplitPayment = async () => {
+    if (!splitOrder || !splitAmount) return;
+    try {
+      const result = await apiClient(`/orders/${splitOrder.id}/split-pay`, 'POST', {
+        method: splitMethod,
+        amount: parseFloat(splitAmount),
+        tip: 0,
+        label: splitLabel || `Pago ${splitPayments.length + 1}`,
+      });
+      setSplitPayments([...splitPayments, { amount: parseFloat(splitAmount), method: splitMethod, label: splitLabel || `Pago ${splitPayments.length + 1}` }]);
+      setSplitAmount('');
+      setSplitLabel('');
+      if (result.status === 'CLOSED') {
+        alert('✅ Cuenta saldada — orden cerrada');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al procesar pago parcial');
+    }
+  };
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -425,7 +453,116 @@ export default function OrderPanel() {
                 onClick={handleConfirmPay}
                 className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors"
               >
-                ✓ Confirmar cobro
+                ✓ Cobrar todo
+              </button>
+            </div>
+            {/* Dividir cuenta option */}
+            <button
+              onClick={() => { setSplitOrder(payModal); setPayModal(null); setSplitParts(2); setSplitPayments([]); }}
+              className="w-full mt-2 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-medium rounded-xl transition-colors"
+            >
+              ✂️ Dividir cuenta entre varias personas
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: División de cuenta */}
+      {splitOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setSplitOrder(null)} />
+          <div className="relative bg-gray-900 rounded-2xl p-5 w-full max-w-md border border-gray-700 max-h-[90vh] overflow-auto">
+            <h2 className="text-white font-bold text-lg mb-1">✂️ Dividir cuenta</h2>
+            <p className="text-gray-400 text-sm mb-4">
+              Total: <span className="text-emerald-400 font-bold">${splitOrder.total?.toFixed(2)}</span>
+              {splitPayments.length > 0 && (
+                <span className="text-gray-500 ml-2">
+                  · Pagado: ${splitPayments.reduce((s, p) => s + p.amount, 0).toFixed(2)}
+                  · Restante: <span className="text-amber-400">${(splitOrder.total - splitPayments.reduce((s, p) => s + p.amount, 0)).toFixed(2)}</span>
+                </span>
+              )}
+            </p>
+
+            {/* Quick split buttons */}
+            <div className="flex gap-2 mb-4">
+              {[2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setSplitParts(n)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    splitParts === n ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  ÷{n}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-gray-500 text-xs mb-2">
+              Cada parte: <span className="text-white font-bold">${(splitOrder.total / splitParts).toFixed(2)}</span>
+            </p>
+
+            {/* Payment list */}
+            {splitPayments.length > 0 && (
+              <div className="mb-3 space-y-1">
+                {splitPayments.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+                    <span className="text-emerald-400 text-xs">✓ {p.label || `Pago ${i + 1}`}</span>
+                    <span className="text-emerald-400 text-xs font-bold">${p.amount.toFixed(2)} ({p.method})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add payment form */}
+            {(splitOrder.total - splitPayments.reduce((s, p) => s + p.amount, 0)) > 0.01 && (
+              <div className="bg-gray-800 rounded-xl border border-gray-700 p-3 space-y-2">
+                <p className="text-white text-xs font-medium">Agregar pago #{splitPayments.length + 1}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={splitAmount}
+                    onChange={(e) => setSplitAmount(e.target.value)}
+                    className="bg-gray-900 text-white text-sm rounded-lg border border-gray-600 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                    placeholder={`$${(splitOrder.total / splitParts).toFixed(2)}`}
+                    min="0"
+                    step="0.5"
+                  />
+                  <select
+                    value={splitMethod}
+                    onChange={(e) => setSplitMethod(e.target.value as PaymentMethod)}
+                    className="bg-gray-900 text-white text-sm rounded-lg border border-gray-600 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="CASH">💵 Efectivo</option>
+                    <option value="CARD">💳 Tarjeta</option>
+                    <option value="TRANSFER">📲 Transferencia</option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={splitLabel}
+                  onChange={(e) => setSplitLabel(e.target.value)}
+                  className="w-full bg-gray-900 text-white text-sm rounded-lg border border-gray-600 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                  placeholder="Nombre (opcional): Juan, María..."
+                />
+                <button
+                  onClick={handleSplitPayment}
+                  disabled={!splitAmount || parseFloat(splitAmount) <= 0}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-sm font-medium rounded-xl transition-colors"
+                >
+                  💰 Registrar pago ${splitAmount ? `$${parseFloat(splitAmount).toFixed(2)}` : ''}
+                </button>
+              </div>
+            )}
+
+            {/* Close button */}
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => { setSplitOrder(null); fetchOrders(); }}
+                className="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl transition-colors"
+              >
+                {splitPayments.length > 0 && (splitOrder.total - splitPayments.reduce((s, p) => s + p.amount, 0)) <= 0.01
+                  ? '✅ Cerrar (cuenta saldada)' : 'Cerrar'}
               </button>
             </div>
           </div>

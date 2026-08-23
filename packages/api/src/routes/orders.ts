@@ -70,6 +70,25 @@ router.patch('/:id/pay', validate(payOrderSchema), async (req: AuthRequest, res,
   }
 });
 
+// POST /api/orders/:id/split-pay — pago parcial (división de cuenta)
+const splitPaySchema = z.object({
+  method: z.enum(['CASH', 'CARD', 'TRANSFER', 'OTHER']).default('CASH'),
+  amount: z.number().positive('El monto debe ser mayor a 0'),
+  tip: z.number().min(0).optional().nullable(),
+  label: z.string().optional(), // "Persona 1", "Juan", etc.
+});
+
+router.post('/:id/split-pay', validate(splitPaySchema), async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { method, amount, tip, label } = req.body;
+    const result = await orderService.splitPay(id, req.userId!, method, amount, tip || 0, label);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/orders/:id — order detail with timeline
 router.get('/:id', async (req, res, next) => {
   try {
