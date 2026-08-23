@@ -22,6 +22,11 @@ interface EmployeeSales {
   avgTicket: number;
 }
 
+interface EmployeeReport {
+  creators: EmployeeSales[];
+  cashiers: EmployeeSales[];
+}
+
 interface ProductSales {
   id: string;
   name: string;
@@ -50,7 +55,7 @@ const PIE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
 export default function Dashboard() {
   const [period, setPeriod] = useState<Period>('today');
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [employees, setEmployees] = useState<EmployeeSales[]>([]);
+  const [employees, setEmployees] = useState<EmployeeReport>({ creators: [], cashiers: [] });
   const [products, setProducts] = useState<ProductSales[]>([]);
   const [dailyData, setDailyData] = useState<{ date: string; sales: number; orders: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,20 +198,20 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Two columns on desktop: Employees + Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+      {/* Three columns on desktop: Creators + Cashiers + Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
 
-        {/* Ventas por empleado */}
+        {/* Ventas por empleado — Meseros (crearon la orden) */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-700">
-            <h2 className="text-white font-semibold text-sm md:text-base">👤 Ventas por empleado</h2>
+            <h2 className="text-white font-semibold text-sm md:text-base">🍽️ Meseros (crearon la orden)</h2>
           </div>
           <div className="p-3 md:p-4">
-            {employees.length === 0 ? (
+            {employees.creators.length === 0 ? (
               <p className="text-gray-500 text-sm text-center py-4">Sin ventas en este período</p>
             ) : (
               <div className="space-y-3">
-                {employees.map((emp, i) => (
+                {employees.creators.map((emp, i) => (
                   <div key={emp.id} className="flex items-center gap-3">
                     <span className="text-gray-500 text-xs font-mono w-5 shrink-0">#{i + 1}</span>
                     <div className="flex-1 min-w-0">
@@ -223,7 +228,45 @@ export default function Dashboard() {
                       <div className="mt-1.5 h-1.5 bg-gray-700 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${employees[0] ? (emp.total / employees[0].total) * 100 : 0}%` }}
+                          style={{ width: `${employees.creators[0] ? (emp.total / employees.creators[0].total) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Ventas por empleado — Cajeros (cobraron la orden) */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-700">
+            <h2 className="text-white font-semibold text-sm md:text-base">💰 Cajeros (cobraron la orden)</h2>
+          </div>
+          <div className="p-3 md:p-4">
+            {employees.cashiers.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-4">Sin cobros en este período</p>
+            ) : (
+              <div className="space-y-3">
+                {employees.cashiers.map((emp, i) => (
+                  <div key={emp.id} className="flex items-center gap-3">
+                    <span className="text-gray-500 text-xs font-mono w-5 shrink-0">#{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white text-sm font-medium truncate">{emp.name}</span>
+                        <span className="text-blue-400 font-bold text-sm ml-2">${emp.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-gray-500 text-xs">{emp.orders} cobros</span>
+                        <span className="text-gray-600 text-xs">·</span>
+                        <span className="text-gray-500 text-xs">Ticket: ${emp.avgTicket}</span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="mt-1.5 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${employees.cashiers[0] ? (emp.total / employees.cashiers[0].total) * 100 : 0}%` }}
                         />
                       </div>
                     </div>

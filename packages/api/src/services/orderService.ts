@@ -96,12 +96,13 @@ export const orderService = {
       },
     });
 
-    // 2. Cambiar estado a CLOSED, registrar timestamp y cliente (si se asignó)
+    // 2. Cambiar estado a CLOSED, registrar timestamp, cajero y cliente (si se asignó)
     const closedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
         status: 'CLOSED',
         closedAt: new Date(),
+        closedById: userId,
         ...(customerId && { customerId }),
       },
       include: { items: true, table: true, payments: true }

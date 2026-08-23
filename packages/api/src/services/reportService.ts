@@ -94,7 +94,7 @@ export const reportService = {
   },
 
   /**
-   * Ventas por empleado
+   * Ventas por empleado — separando quien creó la orden vs quien cobró
    */
   getByEmployee: async (period: string = 'today', from?: string, to?: string) => {
     const range = getDateRange(period as any, from, to);
@@ -106,27 +106,53 @@ export const reportService = {
       },
       include: {
         user: { select: { id: true, name: true, username: true, role: true } },
+        closedBy: { select: { id: true, name: true, username: true, role: true } },
       },
     });
 
-    const byEmployee: Record<string, { name: string; role: string; orders: number; total: number }> = {};
+    // Stats por creador (mesero que tomó la orden)
+    const byCreator: Record<string, { name: string; role: string; orders: number; total: number }> = {};
+    // Stats por cajero (quien cobró)
+    const byCashier: Record<string, { name: string; role: string; orders: number; total: number }> = {};
+
     for (const order of closedOrders) {
-      const key = order.userId;
-      if (!byEmployee[key]) {
-        byEmployee[key] = {
+      // Creador
+      const creatorKey = order.userId;
+      if (!byCreator[creatorKey]) {
+        byCreator[creatorKey] = {
           name: order.user.name,
           role: order.user.role,
           orders: 0,
           total: 0,
         };
       }
-      byEmployee[key].orders += 1;
-      byEmployee[key].total += order.total;
+      byCreator[creatorKey].orders += 1;
+      byCreator[creatorKey].total += order.total;
+
+      // Cajero (quien cobró)
+      const cashier = order.closedBy || order.user; // fallback: si no hay closedBy, usar el creador
+      const cashierKey = cashier.id;
+      if (!byCashier[cashierKey]) {
+        byCashier[cashierKey] = {
+          name: cashier.name,
+          role: cashier.role,
+          orders: 0,
+          total: 0,
+        };
+      }
+      byCashier[cashierKey].orders += 1;
+      byCashier[cashierKey].total += order.total;
     }
 
-    return Object.entries(byEmployee)
+    const creators = Object.entries(byCreator)
       .map(([id, data]) => ({ id, ...data, avgTicket: Math.round((data.total / data.orders) * 100) / 100 }))
       .sort((a, b) => b.total - a.total);
+
+    const cashiers = Object.entries(byCashier)
+      .map(([id, data]) => ({ id, ...data, avgTicket: Math.round((data.total / data.orders) * 100) / 100 }))
+      .sort((a, b) => b.total - a.total);
+
+    return { creators, cashiers };
   },
 
   /**
@@ -186,6 +212,7 @@ export const reportService = {
           items: { include: { product: { select: { name: true } } } },
           table: { select: { name: true } },
           user: { select: { name: true } },
+          closedBy: { select: { name: true } },
           payments: { select: { method: true, amount: true } },
         },
         orderBy: { closedAt: 'desc' },
