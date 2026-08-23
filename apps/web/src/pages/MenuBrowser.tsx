@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { useOrderStore } from '../stores/orderStore';
+import { printKitchenTicket } from '../lib/printTicket';
 
 interface Product {
   id: string;
@@ -60,9 +61,23 @@ export default function MenuBrowser() {
       }
 
       await apiClient(`/orders/${order.id}/send`, 'PATCH');
+
+      // Ofrecer imprimir comanda de cocina
+      const shouldPrint = confirm('✅ ¡Orden enviada a cocina! ¿Imprimir comanda?');
+      if (shouldPrint) {
+        const user = JSON.parse(localStorage.getItem('pos_user') || '{}');
+        printKitchenTicket({
+          ticketNumber: order.ticketNumber || 0,
+          tableName: selectedTable?.name || null,
+          orderType: selectedTable ? 'DINE_IN' : 'TAKEAWAY',
+          waiterName: user?.name || 'Mesero',
+          items: items.map((i) => ({ name: i.name, quantity: i.quantity })),
+          createdAt: new Date().toISOString(),
+        });
+      }
+
       clearCart();
       setCartOpen(false);
-      alert('¡Orden enviada a cocina correctamente!');
     } catch (err) {
       alert('Error al enviar la orden');
     } finally {

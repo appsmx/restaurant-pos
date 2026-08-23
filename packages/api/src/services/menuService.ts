@@ -2,6 +2,8 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 
 export const menuService = {
+  // ==================== CATEGORÍAS ====================
+
   getCategories: async () => {
     return prisma.category.findMany({
       where: { active: true },
@@ -15,6 +17,54 @@ export const menuService = {
     });
   },
 
+  getAllCategories: async () => {
+    return prisma.category.findMany({
+      orderBy: { sort: 'asc' },
+      include: {
+        _count: { select: { products: true } },
+      },
+    });
+  },
+
+  createCategory: async (data: { name: string; sort?: number }) => {
+    return prisma.category.create({
+      data: {
+        name: data.name,
+        sort: data.sort || 0,
+      },
+    });
+  },
+
+  updateCategory: async (id: string, data: { name?: string; sort?: number; active?: boolean }) => {
+    const category = await prisma.category.findUnique({ where: { id } });
+    if (!category) throw new AppError('Categoría no encontrada', 404);
+
+    return prisma.category.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.sort !== undefined && { sort: data.sort }),
+        ...(data.active !== undefined && { active: data.active }),
+      },
+    });
+  },
+
+  deleteCategory: async (id: string) => {
+    const category = await prisma.category.findUnique({
+      where: { id },
+      include: { _count: { select: { products: true } } },
+    });
+    if (!category) throw new AppError('Categoría no encontrada', 404);
+    if (category._count.products > 0) {
+      throw new AppError('No se puede eliminar una categoría con productos. Mueve o elimina los productos primero.', 400);
+    }
+
+    await prisma.category.delete({ where: { id } });
+    return { success: true };
+  },
+
+  // ==================== PRODUCTOS ====================
+
   getProducts: async (categoryId?: string) => {
     return prisma.product.findMany({
       where: { 
@@ -22,6 +72,17 @@ export const menuService = {
         ...(categoryId ? { categoryId } : {})
       },
       include: { modifiers: true },
+      orderBy: { name: 'asc' },
+    });
+  },
+
+  getAllProducts: async (categoryId?: string) => {
+    return prisma.product.findMany({
+      where: categoryId ? { categoryId } : {},
+      include: { 
+        category: { select: { name: true } },
+        _count: { select: { ingredients: true } },
+      },
       orderBy: { name: 'asc' },
     });
   },
@@ -39,5 +100,31 @@ export const menuService = {
         type: data.type || 'STANDARD',
       }
     });
-  }
+  },
+
+  updateProduct: async (id: string, data: { name?: string; description?: string; price?: number; categoryId?: string; active?: boolean }) => {
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) throw new AppError('Producto no encontrado', 404);
+
+    return prisma.product.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description || null }),
+        ...(data.price !== undefined && { price: data.price }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+        ...(data.active !== undefined && { active: data.active }),
+      },
+      include: { category: { select: { name: true } } },
+    });
+  },
+
+  deleteProduct: async (id: string) => {
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) throw new AppError('Producto no encontrado', 404);
+
+    // Soft delete — just deactivate
+    await prisma.product.update({ where: { id }, data: { active: false } });
+    return { success: true };
+  },
 };

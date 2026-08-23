@@ -45,4 +45,14 @@ router.patch('/order/:orderId/ready', async (req, res, next) => {
   }
 });
 
+// GET /api/kitchen/completed — órdenes completadas recientemente
+router.get('/completed', async (req, res, next) => {
+  try {
+    const data = await kitchenService.getRecentlyCompleted();
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

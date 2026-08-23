@@ -17,6 +17,8 @@ export const kitchenService = {
         order: {
           select: {
             id: true,
+            ticketNumber: true,
+            type: true,
             createdAt: true,
             table: { select: { name: true } },
             user: { select: { name: true } },
@@ -29,6 +31,8 @@ export const kitchenService = {
     // Agrupar por orden
     const orderMap: Record<string, {
       orderId: string;
+      ticketNumber: number;
+      orderType: string;
       tableName: string | null;
       waiterName: string;
       createdAt: string;
@@ -40,6 +44,8 @@ export const kitchenService = {
       if (!orderMap[key]) {
         orderMap[key] = {
           orderId: item.order.id,
+          ticketNumber: (item.order as any).ticketNumber,
+          orderType: (item.order as any).type,
           tableName: item.order.table?.name || null,
           waiterName: item.order.user.name,
           createdAt: item.order.createdAt.toISOString(),
@@ -120,5 +126,35 @@ export const kitchenService = {
     });
 
     return { success: true };
+  },
+
+  /**
+   * Obtener órdenes completadas recientemente (última hora) para referencia del cocinero
+   */
+  getRecentlyCompleted: async () => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    const orders = await prisma.order.findMany({
+      where: {
+        status: { in: ['READY', 'DELIVERED', 'CLOSED'] },
+        updatedAt: { gte: oneHourAgo },
+      },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+        table: { select: { name: true } },
+        user: { select: { name: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+
+    return orders.map((o) => ({
+      orderId: o.id,
+      ticketNumber: o.ticketNumber,
+      tableName: o.table?.name || null,
+      status: o.status,
+      completedAt: o.updatedAt.toISOString(),
+      items: o.items.map((i) => ({ quantity: i.quantity, name: i.product.name })),
+    }));
   },
 };
