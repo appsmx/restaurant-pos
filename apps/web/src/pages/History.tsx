@@ -114,6 +114,19 @@ export default function History() {
     setDetailError('');
   };
 
+  const handleReopenOrder = async () => {
+    if (!detail) return;
+    if (!confirm('⚠️ ¿Reabrir esta orden? Se eliminarán los pagos registrados y la orden volverá a aparecer en Órdenes Activas.')) return;
+    try {
+      await apiClient(`/orders/${detail.id}/reopen`, 'PATCH');
+      alert('✅ Orden reabierta');
+      closeDetail();
+      fetchHistory(pagination.page);
+    } catch (err: any) {
+      alert(err.message || 'Error al reabrir la orden');
+    }
+  };
+
   useEffect(() => { fetchHistory(1); }, []);
 
   const handleFilter = () => fetchHistory(1);
@@ -129,10 +142,18 @@ export default function History() {
       <div>
         <div className="flex items-center gap-3 mb-5">
           <button onClick={closeDetail} className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-xl">← Volver</button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Orden #{detail.ticketNumber}</h1>
             <p className="text-gray-500 text-xs">{detail.table ? `🍽️ ${detail.table.name}` : '📦 Para llevar'} · {formatDate(detail.createdAt)}</p>
           </div>
+          {detail.status === 'CLOSED' && (
+            <button
+              onClick={handleReopenOrder}
+              className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-xl transition-colors shrink-0"
+            >
+              🔄 Reabrir orden
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -99,4 +99,26 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// DELETE /api/orders/:id/items/:itemId — cancelar/quitar un item de la orden
+router.delete('/:id/items/:itemId', async (req: AuthRequest, res, next) => {
+  try {
+    const { id, itemId } = req.params;
+    const result = await orderService.cancelItem(id, itemId, req.userId!);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/orders/:id/reopen — reabrir orden cerrada (revertir cobro)
+router.patch('/:id/reopen', async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await orderService.reopenOrder(id, req.userId!);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
