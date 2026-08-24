@@ -84,26 +84,26 @@ export default function MenuBrowser() {
         createdAt: new Date().toISOString(),
       };
 
+      // TODO: Re-habilitar impresión cuando se configure impresora
       // Imprimir comanda de COCINA (si hay items de comida)
-      if (kitchenItems.length > 0) {
-        printKitchenTicket({
-          ...baseTicket,
-          items: kitchenItems.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes || undefined })),
-          destination: 'COCINA',
-        });
-      }
+      // if (kitchenItems.length > 0) {
+      //   printKitchenTicket({
+      //     ...baseTicket,
+      //     items: kitchenItems.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes || undefined })),
+      //     destination: 'COCINA',
+      //   });
+      // }
 
       // Imprimir comanda de BARRA (si hay bebidas)
-      if (barItems.length > 0) {
-        // Pequeño delay para que el browser procese la primera ventana
-        setTimeout(() => {
-          printKitchenTicket({
-            ...baseTicket,
-            items: barItems.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes || undefined })),
-            destination: 'BARRA',
-          });
-        }, 500);
-      }
+      // if (barItems.length > 0) {
+      //   setTimeout(() => {
+      //     printKitchenTicket({
+      //       ...baseTicket,
+      //       items: barItems.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes || undefined })),
+      //       destination: 'BARRA',
+      //     });
+      //   }, 500);
+      // }
 
       clearCart();
       setCartOpen(false);
@@ -224,7 +224,7 @@ export default function MenuBrowser() {
           <div className="absolute inset-0 bg-black/60" onClick={() => setCartOpen(false)} />
 
           {/* Drawer */}
-          <div className="relative bg-gray-900 rounded-t-2xl p-5 max-h-[80vh] overflow-auto border-t border-gray-700">
+          <div className="relative bg-gray-900 rounded-t-2xl p-5 pb-24 max-h-[85vh] overflow-auto border-t border-gray-700">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg">Ticket Actual</h3>
               <div className="flex items-center gap-3">

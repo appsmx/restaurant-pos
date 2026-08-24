@@ -77,7 +77,7 @@ export default function POSLayout() {
   };
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-gray-950 text-white">
+    <div className="min-h-screen flex flex-col md:flex-row bg-gray-950 text-white">
       {/* Sidebar — visible solo en desktop */}
       <div className="hidden md:block">
         <Sidebar activeView={activeView} onViewChange={setActiveView} navItems={visibleItems} />
