@@ -1,6 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { apiClient } from '../lib/apiClient';
 
+interface KitchenItemModifier {
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 interface KitchenItem {
   id: string;
   quantity: number;
@@ -8,6 +14,7 @@ interface KitchenItem {
   status: string;
   product: { name: string; category: { name: string } };
   orderId: string;
+  modifiers: KitchenItemModifier[];
 }
 
 interface KitchenOrder {
@@ -236,6 +243,15 @@ export default function Kitchen({ destination, title, icon }: { destination?: st
                                 </span>
                                 <span className="text-white text-sm font-medium truncate">{item.product.name}</span>
                               </div>
+                              {item.modifiers && item.modifiers.length > 0 && (
+                                <div className="ml-8 mt-0.5 space-y-0">
+                                  {item.modifiers.map((mod, midx) => (
+                                    <p key={midx} className="text-cyan-300 text-xs">
+                                      🧩 {mod.name}{mod.price > 0 ? ` (+$${mod.price.toFixed(2)})` : ''}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
                               {item.notes && (
                                 <p className="text-amber-400 text-xs mt-0.5 ml-8">⚠️ {item.notes}</p>
                               )}

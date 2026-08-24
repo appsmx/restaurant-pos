@@ -5,16 +5,29 @@ export const menuService = {
   // ==================== CATEGORÍAS ====================
 
   getCategories: async () => {
-    return prisma.category.findMany({
+    const categories = await prisma.category.findMany({
       where: { active: true },
       orderBy: { sort: 'asc' },
       include: {
         products: {
           where: { active: true },
           orderBy: { name: 'asc' },
+          include: { _count: { select: { modifiers: true } } },
         },
       },
     });
+
+    // Add hasModifiers flag to each product
+    return categories.map((cat) => ({
+      ...cat,
+      products: cat.products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        description: p.description,
+        hasModifiers: p._count.modifiers > 0,
+      })),
+    }));
   },
 
   getAllCategories: async () => {

@@ -52,26 +52,51 @@ export const orderService = {
     return order;
   },
 
-  addOrderItem: async (orderId: string, productId: string, quantity: number, notes?: string, userId?: string) => {
+  addOrderItem: async (orderId: string, productId: string, quantity: number, notes?: string, userId?: string, modifiers?: { modifierId: string; quantity?: number }[]) => {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) throw new AppError('Producto no encontrado', 404);
+
+    // Calculate modifier price additions
+    let modifierPriceTotal = 0;
+    if (modifiers && modifiers.length > 0) {
+      const modifierItems = await prisma.modifierItem.findMany({
+        where: { id: { in: modifiers.map((m) => m.modifierId) } },
+      });
+      for (const mod of modifiers) {
+        const modItem = modifierItems.find((mi) => mi.id === mod.modifierId);
+        if (modItem) {
+          modifierPriceTotal += modItem.price * (mod.quantity || 1);
+        }
+      }
+    }
+
+    const unitPrice = product.price + modifierPriceTotal;
 
     const orderItem = await prisma.orderItem.create({
       data: {
         orderId,
         productId,
         quantity,
-        unitPrice: product.price,
+        unitPrice,
         notes: notes || null,
         status: 'PENDING'
       }
     });
 
-    // Update subtotal and total
-    const newSubtotal = await prisma.orderItem.aggregate({
-      where: { orderId },
-      _sum: { unitPrice: true },
-    });
+    // Create OrderItemModifier records
+    if (modifiers && modifiers.length > 0) {
+      await Promise.all(
+        modifiers.map((mod) =>
+          prisma.orderItemModifier.create({
+            data: {
+              orderItemId: orderItem.id,
+              modifierId: mod.modifierId,
+              quantity: mod.quantity || 1,
+            },
+          })
+        )
+      );
+    }
 
     // Recalculate total from all items
     const allItems = await prisma.orderItem.findMany({ where: { orderId } });
@@ -85,7 +110,8 @@ export const orderService = {
     // Log event
     if (userId) {
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
-      await logEvent(orderId, 'ITEM_ADDED', userId, user?.name || 'Sistema', `${quantity}x ${product.name}${notes ? ` (${notes})` : ''}`);
+      const modNote = modifiers && modifiers.length > 0 ? ` (+${modifiers.length} extras)` : '';
+      await logEvent(orderId, 'ITEM_ADDED', userId, user?.name || 'Sistema', `${quantity}x ${product.name}${modNote}${notes ? ` (${notes})` : ''}`);
     }
 
     return orderItem;
@@ -119,17 +145,43 @@ export const orderService = {
   },
 
   getActiveOrders: async () => {
-    return prisma.order.findMany({
+    const orders = await prisma.order.findMany({
       where: {
         status: { in: ['OPEN', 'SENT', 'PREPARING', 'READY'] }
       },
       include: {
-        items: { include: { product: true } },
+        items: { include: { product: true, modifiers: true } },
         table: true,
         user: { select: { name: true } }
       },
       orderBy: { ticketNumber: 'desc' }
     });
+
+    // Resolve modifier names for all orders
+    const allModifierIds = orders.flatMap((o) => o.items.flatMap((i) => i.modifiers.map((m) => m.modifierId)));
+    let modifierLookup: Record<string, { name: string; price: number }> = {};
+    if (allModifierIds.length > 0) {
+      const modifierRecords = await prisma.modifierItem.findMany({
+        where: { id: { in: allModifierIds } },
+        select: { id: true, name: true, price: true },
+      });
+      for (const m of modifierRecords) {
+        modifierLookup[m.id] = { name: m.name, price: m.price };
+      }
+    }
+
+    return orders.map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({
+        ...item,
+        modifiers: item.modifiers.map((m) => ({
+          id: m.id,
+          name: modifierLookup[m.modifierId]?.name || 'Extra',
+          price: modifierLookup[m.modifierId]?.price || 0,
+          quantity: m.quantity,
+        })),
+      })),
+    }));
   },
 
   closeOrder: async (
@@ -247,7 +299,12 @@ export const orderService = {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        items: { include: { product: { select: { name: true, price: true } } } },
+        items: {
+          include: {
+            product: { select: { name: true, price: true } },
+            modifiers: true,
+          },
+        },
         table: { select: { name: true } },
         user: { select: { id: true, name: true, role: true } },
         closedBy: { select: { id: true, name: true, role: true } },
@@ -256,6 +313,30 @@ export const orderService = {
     });
 
     if (!order) throw new AppError('Orden no encontrada', 404);
+
+    // Resolve modifier names
+    const allModifierIds = order.items.flatMap((item) => item.modifiers.map((m) => m.modifierId));
+    let modifierLookup: Record<string, { name: string; price: number }> = {};
+    if (allModifierIds.length > 0) {
+      const modifierRecords = await prisma.modifierItem.findMany({
+        where: { id: { in: allModifierIds } },
+        select: { id: true, name: true, price: true },
+      });
+      for (const m of modifierRecords) {
+        modifierLookup[m.id] = { name: m.name, price: m.price };
+      }
+    }
+
+    // Enrich items with modifier names
+    const enrichedItems = order.items.map((item) => ({
+      ...item,
+      modifiers: item.modifiers.map((m) => ({
+        id: m.id,
+        name: modifierLookup[m.modifierId]?.name || 'Extra',
+        price: modifierLookup[m.modifierId]?.price || 0,
+        quantity: m.quantity,
+      })),
+    }));
 
     // Try to fetch events separately (table may not exist yet)
     let events: any[] = [];
@@ -268,7 +349,7 @@ export const orderService = {
       // OrderEvent table doesn't exist yet — return empty
     }
 
-    return { ...order, events };
+    return { ...order, items: enrichedItems, events };
   },
 
   /**
