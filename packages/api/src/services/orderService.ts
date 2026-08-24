@@ -333,4 +333,81 @@ export const orderService = {
 
     return { status: 'PARTIAL', totalPaid, remaining: Math.max(0, remaining), message: `Faltan $${remaining.toFixed(2)} por cobrar` };
   },
+
+  /**
+   * Cancelar/quitar un item de una orden abierta (antes de cobrar)
+   */
+  cancelItem: async (orderId: string, itemId: string, userId: string) => {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new AppError('Orden no encontrada', 404);
+    if (order.status === 'CLOSED') throw new AppError('No se pueden quitar items de una orden cerrada', 400);
+
+    const item = await prisma.orderItem.findUnique({
+      where: { id: itemId },
+      include: { product: { select: { name: true } } },
+    });
+    if (!item) throw new AppError('Item no encontrado', 404);
+    if (item.orderId !== orderId) throw new AppError('El item no pertenece a esta orden', 400);
+
+    // Remove the item
+    await prisma.orderItem.delete({ where: { id: itemId } });
+
+    // Recalculate order total
+    const remainingItems = await prisma.orderItem.findMany({ where: { orderId } });
+    const newTotal = remainingItems.reduce((sum, i) => sum + (i.unitPrice * i.quantity), 0);
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { total: newTotal, subtotal: newTotal },
+    });
+
+    // Log event
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    await logEvent(orderId, 'ITEM_CANCELLED', userId, user?.name || 'Usuario', `Cancelado: ${item.quantity}x ${item.product.name}`);
+
+    return { success: true, removedItem: item.product.name, newTotal };
+  },
+
+  /**
+   * Reabrir una orden cerrada (revertir cobro)
+   * Elimina los pagos y vuelve la orden a estado READY
+   */
+  reopenOrder: async (orderId: string, userId: string) => {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: true },
+    });
+    if (!order) throw new AppError('Orden no encontrada', 404);
+    if (order.status !== 'CLOSED') throw new AppError('Solo se pueden reabrir órdenes cerradas', 400);
+
+    // Delete all payments for this order
+    await prisma.payment.deleteMany({ where: { orderId } });
+
+    // Reopen the order
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'READY',
+        closedAt: null,
+        closedById: null,
+        discount: 0,
+        discountType: null,
+        discountReason: null,
+      },
+    });
+
+    // If order had a table, mark it as OCCUPIED again
+    if (order.tableId) {
+      await prisma.table.update({
+        where: { id: order.tableId },
+        data: { status: 'OCCUPIED' },
+      });
+    }
+
+    // Log event
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    await logEvent(orderId, 'REOPENED', userId, user?.name || 'Admin', `Orden reabierta. Pagos revertidos: $${order.payments.reduce((s, p) => s + p.amount, 0).toFixed(2)}`);
+
+    return { success: true, message: 'Orden reabierta. Los pagos fueron eliminados.' };
+  },
 };

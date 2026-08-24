@@ -67,6 +67,16 @@ export default function OrderPanel() {
   const [splitMethod, setSplitMethod] = useState<PaymentMethod>('CASH');
   const [splitLabel, setSplitLabel] = useState('');
 
+  const handleCancelItem = async (orderId: string, itemId: string, itemName: string) => {
+    if (!confirm(`¿Quitar "${itemName}" de la orden?`)) return;
+    try {
+      await apiClient(`/orders/${orderId}/items/${itemId}`, 'DELETE');
+      fetchOrders();
+    } catch (err: any) {
+      alert(err.message || 'Error al quitar item');
+    }
+  };
+
   const handleSplitPayment = async () => {
     if (!splitOrder || !splitAmount) return;
     try {
@@ -260,13 +270,24 @@ export default function OrderPanel() {
                 {/* Lista de items */}
                 <div className="p-3 md:p-4 space-y-2 flex-1">
                   {order.items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
+                    <div key={item.id} className="flex justify-between text-sm items-center">
                       <div className="text-gray-300 flex-1">
                         <span className="text-gray-500 mr-1">x{item.quantity}</span>
                         <span className="line-clamp-1">{item.product.name}</span>
                         {item.notes && <span className="text-blue-400 ml-1 text-xs">*{item.notes}</span>}
                       </div>
-                      <span className="text-gray-400 ml-2 shrink-0">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                      <div className="flex items-center gap-1 ml-2">
+                        <span className="text-gray-400 shrink-0">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                        {order.status !== 'CLOSED' && item.status === 'PENDING' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCancelItem(order.id, item.id, item.product.name); }}
+                            className="text-red-400 hover:text-red-300 text-xs ml-1"
+                            title="Quitar item"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
