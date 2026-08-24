@@ -17,9 +17,10 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   WAITER: { label: 'Mesero', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
   CASHIER: { label: 'Cajero', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
   CHEF: { label: 'Cocinero', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  BARTENDER: { label: 'Bartender', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
 };
 
-const ROLES = ['ADMIN', 'MANAGER', 'WAITER', 'CASHIER', 'CHEF'];
+const ROLES = ['ADMIN', 'MANAGER', 'WAITER', 'CASHIER', 'CHEF', 'BARTENDER'];
 
 export default function Employees() {
   const [users, setUsers] = useState<User[]>([]);
@@ -307,7 +308,8 @@ export default function Employees() {
           <div><span className="text-blue-400 font-medium">Gerente:</span> Todo excepto gestión de empleados</div>
           <div><span className="text-amber-400 font-medium">Cajero:</span> Cobrar, caja, clientes, órdenes</div>
           <div><span className="text-emerald-400 font-medium">Mesero:</span> Mesas, menú, tomar pedidos, clientes</div>
-          <div><span className="text-orange-400 font-medium">Cocinero:</span> Pantalla de cocina (ver y completar pedidos)</div>
+          <div><span className="text-orange-400 font-medium">Cocinero:</span> Pantalla de cocina (ver y completar platillos)</div>
+          <div><span className="text-pink-400 font-medium">Bartender:</span> Pantalla de barra (ver y completar bebidas)</div>
         </div>
       </div>
     </div>
