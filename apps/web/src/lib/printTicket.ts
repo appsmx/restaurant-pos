@@ -30,6 +30,7 @@ interface KitchenTicketData {
   waiterName: string;
   items: { name: string; quantity: number; notes?: string }[];
   createdAt: string;
+  destination?: string; // 'COCINA' | 'BARRA' — if not set, prints as generic comanda
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -130,13 +131,15 @@ export function printTicket(data: TicketData) {
 export function printKitchenTicket(data: KitchenTicketData) {
   const time = new Date(data.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
   const orderTypeLabel = data.orderType === 'TAKEAWAY' ? '📦 PARA LLEVAR' : data.orderType === 'DELIVERY' ? '🛵 DELIVERY' : '';
+  const destination = data.destination || 'COCINA';
+  const destIcon = destination === 'BARRA' ? '🍺' : '🍳';
 
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Comanda #${data.ticketNumber}</title>
+  <title>Comanda #${data.ticketNumber} — ${destination}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Courier New', monospace; font-size: 14px; width: 80mm; padding: 5mm; }
@@ -158,7 +161,7 @@ export function printKitchenTicket(data: KitchenTicketData) {
 </head>
 <body>
   <div class="center header">
-    <p class="big">🍳 COMANDA</p>
+    <p class="big">${destIcon} ${destination}</p>
     <p class="big">#${String(data.ticketNumber).padStart(3, '0')}</p>
   </div>
   
