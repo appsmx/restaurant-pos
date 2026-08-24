@@ -1,0 +1,23 @@
+{
+  "port": 9100,
+  "printers": {
+    "COCINA": {
+      "name": "",
+      "description": "Impresora térmica de cocina (platillos)"
+    },
+    "BARRA": {
+      "name": "",
+      "description": "Impresora térmica de barra (bebidas)"
+    },
+    "CAJA": {
+      "name": "",
+      "description": "Impresora térmica de caja (tickets de cliente)"
+    }
+  },
+  "notes": [
+    "Deja 'name' vacío para usar la impresora predeterminada del sistema",
+    "Para ver las impresoras disponibles, ejecuta: node server.js --list-printers",
+    "El 'name' debe coincidir EXACTO con el nombre que aparece en la lista",
+    "Ejemplos de nombres: 'EPSON TM-T20III', 'Star TSP143', 'POS-80C'"
+  ]
+}
