@@ -106,6 +106,18 @@ export default function OrderPanel() {
   }, []);
 
   const openPayModal = (order: Order) => {
+    // Guard: warn if order hasn't been marked as READY by kitchen
+    if (order.status !== 'READY' && order.status !== 'DELIVERED') {
+      const statusMessages: Record<string, string> = {
+        OPEN: 'Esta orden aún NO se ha enviado a cocina.',
+        SENT: 'Esta orden fue enviada a cocina pero NO ha empezado a prepararse.',
+        PREPARING: 'Esta orden aún se está preparando en cocina.',
+      };
+      const msg = statusMessages[order.status] || 'Esta orden no está lista.';
+      const forceCharge = confirm(`⚠️ ${msg}\n\n¿Cobrar de todas formas?`);
+      if (!forceCharge) return;
+    }
+
     setPayModal(order);
     setSelectedMethod('CASH');
     setSelectedCustomer(null);
@@ -269,9 +281,16 @@ export default function OrderPanel() {
                   <button
                     onClick={() => openPayModal(order)}
                     disabled={isPaying}
-                    className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-600 text-white font-bold py-3 md:py-2.5 rounded-xl md:rounded-lg transition-colors text-sm"
+                    className={`w-full font-bold py-3 md:py-2.5 rounded-xl md:rounded-lg transition-colors text-sm ${
+                      order.status === 'READY' || order.status === 'DELIVERED'
+                        ? 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white'
+                        : 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white'
+                    } disabled:bg-gray-600`}
                   >
-                    {isPaying ? 'Procesando...' : `💰 Cobrar $${order.total?.toFixed(2)}`}
+                    {isPaying ? 'Procesando...' : order.status === 'READY' || order.status === 'DELIVERED'
+                      ? `💰 Cobrar $${order.total?.toFixed(2)}`
+                      : `⚠️ Cobrar $${order.total?.toFixed(2)}`
+                    }
                   </button>
                 </div>
               </div>
