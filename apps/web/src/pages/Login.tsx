@@ -30,6 +30,18 @@ export default function Login() {
         ) : (
           <CredentialsLogin onSwitchMode={() => setMode('pin')} />
         )}
+
+        {/* Logan watermark */}
+        <div className="mt-8 text-center">
+          <a
+            href="https://logancorp.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-600 hover:text-gray-400 text-xs transition-colors"
+          >
+            ⚡ Powered by Logan
+          </a>
+        </div>
       </div>
     </div>
   );

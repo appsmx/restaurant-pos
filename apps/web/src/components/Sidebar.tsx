@@ -33,6 +33,16 @@ export default function Sidebar({ activeView, onViewChange, navItems }: SidebarP
       ))}
 
       <div className="mt-auto flex flex-col items-center gap-2">
+        {/* Logan watermark */}
+        <a
+          href="https://logancorp.vercel.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gray-600 hover:text-gray-400 text-[9px] text-center transition-colors mb-2"
+          title="Powered by Logan"
+        >
+          ⚡ Logan
+        </a>
         <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-white text-sm font-bold">
           {user?.username?.[0]?.toUpperCase() || 'A'}
         </div>
