@@ -209,7 +209,7 @@ export const inventoryService = {
     return ingredients.map((i) => ({
       id: i.id,
       name: i.name,
-      stock: i.stock,
+      stock: Math.round(i.stock * 100) / 100,
       unit: i.unit,
       recipesCount: i._count.recipes,
       severity: i.stock <= 3 ? 'CRITICAL' : i.stock <= threshold ? 'LOW' : 'OK',
