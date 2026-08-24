@@ -7,11 +7,73 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==================== MULTI-TENANT ====================
+
+model Tenant {
+  id             String       @id @default(uuid())
+  slug           String       @unique // "quiroa", "barberiamike", "abarrotes"
+  name           String                // "Mariscos Quiroa"
+  businessType   BusinessType @default(RESTAURANT)
+  plan           Plan         @default(STARTER)
+  active         Boolean      @default(true)
+  enabledModules String[]     // ["kitchen", "bar", "inventory", "loyalty", "digitalMenu"]
+  config         Json         @default("{}") // terminology, colors, branding, etc.
+
+  // Billing
+  setupFee       Float        @default(3000)
+  monthlyRate    Float        @default(500)
+  setupPaid      Boolean      @default(false)
+  billingStartAt DateTime?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  users          User[]
+  sessions       Session[]
+  categories     Category[]
+  products       Product[]
+  modifierGroups ModifierGroup[]
+  modifierItems  ModifierItem[]
+  sections       Section[]
+  tables         Table[]
+  orders         Order[]
+  orderItems     OrderItem[]
+  orderItemModifiers OrderItemModifier[]
+  payments       Payment[]
+  ingredients    Ingredient[]
+  recipeIngredients RecipeIngredient[]
+  stockMovements StockMovement[]
+  syncQueues     SyncQueue[]
+  cashRegisters  CashRegister[]
+  cashMovements  CashMovement[]
+  customers      Customer[]
+  orderEvents    OrderEvent[]
+  config_record  RestaurantConfig?
+}
+
+enum BusinessType {
+  RESTAURANT
+  BARBERSHOP
+  CAFE
+  STORE
+  GENERAL
+}
+
+enum Plan {
+  STARTER  // $500/mes
+  GROWTH   // $1,000/mes
+  PRO      // $1,500/mes
+}
+
+// ==================== USUARIOS ====================
+
 model User {
   id        String   @id @default(uuid())
-  username  String   @unique
+  tenantId  String
+  username  String
   password  String
-  pin       String?  @unique
+  pin       String?
   pinHash   String?
   name      String
   role      Role     @default(WAITER)
@@ -19,24 +81,32 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions       Session[]
-  orders         Order[]  @relation("OrderCreator")
-  closedOrders   Order[]  @relation("OrderCloser")
+  orders         Order[]   @relation("OrderCreator")
+  closedOrders   Order[]   @relation("OrderCloser")
   payments       Payment[]
   stockMoves     StockMovement[]
   cashMoves      CashMovement[]
+
+  @@unique([tenantId, username])
+  @@unique([tenantId, pin])
+  @@index([tenantId])
 }
 
 model Session {
   id        String   @id @default(uuid())
+  tenantId  String
   userId    String
   token     String   @unique
   locked    Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
   @@index([userId])
 }
 
@@ -49,16 +119,24 @@ enum Role {
   BARTENDER
 }
 
+// ==================== MENÚ ====================
+
 model Category {
   id       String    @id @default(uuid())
+  tenantId String
   name     String
   sort     Int       @default(0)
   active   Boolean   @default(true)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   products Product[]
+
+  @@index([tenantId])
 }
 
 model Product {
   id          String         @id @default(uuid())
+  tenantId    String
   name        String
   description String?
   price       Float
@@ -68,10 +146,14 @@ model Product {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category      Category       @relation(fields: [categoryId], references: [id])
   modifiers     ModifierItem[]
   orderItems    OrderItem[]
   ingredients   RecipeIngredient[]
+
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
 }
 
 enum ProductType {
@@ -82,42 +164,63 @@ enum ProductType {
 
 model ModifierGroup {
   id          String         @id @default(uuid())
+  tenantId    String
   name        String
   required    Boolean        @default(false)
   minSelect   Int            @default(0)
   maxSelect   Int            @default(1)
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   modifiers   ModifierItem[]
+
+  @@index([tenantId])
 }
 
 model ModifierItem {
   id           String        @id @default(uuid())
+  tenantId     String
   name         String
   price        Float         @default(0)
   groupId      String
   products     Product[]
 
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   group        ModifierGroup @relation(fields: [groupId], references: [id])
+
+  @@index([tenantId])
 }
 
+// ==================== PLANO / MESAS ====================
+
 model Section {
-  id    String @id @default(uuid())
-  name  String
-  sort  Int    @default(0)
-  tables Table[]
+  id       String  @id @default(uuid())
+  tenantId String
+  name     String
+  sort     Int     @default(0)
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tables   Table[]
+
+  @@index([tenantId])
 }
 
 model Table {
-  id         String     @id @default(uuid())
+  id         String      @id @default(uuid())
+  tenantId   String
   name       String
   sectionId  String
-  capacity   Int        @default(4)
+  capacity   Int         @default(4)
   status     TableStatus @default(AVAILABLE)
-  shape      String     @default("SQUARE")
-  posX       Float      @default(0)
-  posY       Float      @default(0)
+  shape      String      @default("SQUARE")
+  posX       Float       @default(0)
+  posY       Float       @default(0)
 
-  section    Section    @relation(fields: [sectionId], references: [id])
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  section    Section     @relation(fields: [sectionId], references: [id])
   orders     Order[]
+
+  @@index([tenantId])
+  @@index([tenantId, sectionId])
 }
 
 enum TableStatus {
@@ -128,8 +231,11 @@ enum TableStatus {
   OUT_OF_SERVICE
 }
 
+// ==================== ÓRDENES ====================
+
 model Order {
   id             String       @id @default(uuid())
+  tenantId       String
   ticketNumber   Int          @default(0)
   tableId        String?
   customerId     String?
@@ -137,7 +243,7 @@ model Order {
   status         OrderStatus  @default(OPEN)
   total          Float        @default(0)
   discount       Float        @default(0)
-  discountType   String?      // "PERCENT" or "FIXED"
+  discountType   String?
   discountReason String?
   subtotal       Float        @default(0)
   userId         String
@@ -147,12 +253,18 @@ model Order {
   closedAt       DateTime?
   sentAt         DateTime?
 
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   table    Table?    @relation(fields: [tableId], references: [id])
   user     User      @relation("OrderCreator", fields: [userId], references: [id])
   closedBy User?     @relation("OrderCloser", fields: [closedById], references: [id])
   items    OrderItem[]
   payments Payment[]
   events   OrderEvent[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, ticketNumber])
 }
 
 enum OrderType {
@@ -173,6 +285,7 @@ enum OrderStatus {
 
 model OrderItem {
   id           String             @id @default(uuid())
+  tenantId     String
   orderId      String
   productId    String
   quantity     Int                @default(1)
@@ -180,9 +293,13 @@ model OrderItem {
   notes        String?
   status       OrderItemStatus    @default(PENDING)
 
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   order        Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product      Product            @relation(fields: [productId], references: [id])
   modifiers    OrderItemModifier[]
+
+  @@index([tenantId])
+  @@index([orderId])
 }
 
 enum OrderItemStatus {
@@ -196,25 +313,34 @@ enum OrderItemStatus {
 
 model OrderItemModifier {
   id            String       @id @default(uuid())
+  tenantId      String
   orderItemId   String
   modifierId    String
   quantity      Int          @default(1)
 
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orderItem     OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }
 
 model Payment {
-  id        String       @id @default(uuid())
+  id        String        @id @default(uuid())
+  tenantId  String
   orderId   String
   amount    Float
-  tip       Float        @default(0)
+  tip       Float         @default(0)
   method    PaymentMethod
   status    PaymentStatus @default(COMPLETED)
   userId    String
-  createdAt DateTime     @default(now())
+  createdAt DateTime      @default(now())
 
-  order     Order        @relation(fields: [orderId], references: [id])
-  user      User         @relation(fields: [userId], references: [id])
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order     Order         @relation(fields: [orderId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
 }
 
 enum PaymentMethod {
@@ -230,27 +356,39 @@ enum PaymentStatus {
   CANCELLED
 }
 
+// ==================== INVENTARIO ====================
+
 model Ingredient {
-  id       String             @id @default(uuid())
-  name     String
-  stock    Float              @default(0)
-  unit     String             @default("UNIT")
-  recipes  RecipeIngredient[]
+  id        String             @id @default(uuid())
+  tenantId  String
+  name      String
+  stock     Float              @default(0)
+  unit      String             @default("UNIT")
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipes   RecipeIngredient[]
   movements StockMovement[]
+
+  @@index([tenantId])
 }
 
 model RecipeIngredient {
-  id           String    @id @default(uuid())
+  id           String     @id @default(uuid())
+  tenantId     String
   productId    String
   ingredientId String
   quantity     Float
 
-  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }
 
 model StockMovement {
   id           String       @id @default(uuid())
+  tenantId     String
   ingredientId String
   type         MovementType
   quantity     Float
@@ -258,8 +396,12 @@ model StockMovement {
   userId       String
   createdAt    DateTime     @default(now())
 
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ingredient   Ingredient   @relation(fields: [ingredientId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
 }
 
 enum MovementType {
@@ -269,23 +411,30 @@ enum MovementType {
   WASTE
 }
 
+// ==================== SYNC ====================
+
 model SyncQueue {
-  id        String   @id @default(uuid())
-  entity    String
-  entityId  String
-  action    String
-  payload   Json
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now())
+  id          String    @id @default(uuid())
+  tenantId    String
+  entity      String
+  entityId    String
+  action      String
+  payload     Json
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
   processedAt DateTime?
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
 }
-
-
 
 // ==================== CAJA ====================
 
 model CashRegister {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
+  tenantId      String
   status        CashRegisterStatus @default(OPEN)
   openingAmount Float
   closingAmount Float?
@@ -293,11 +442,15 @@ model CashRegister {
   difference    Float?
   openedBy      String
   closedBy      String?
-  openedAt      DateTime @default(now())
+  openedAt      DateTime           @default(now())
   closedAt      DateTime?
   notes         String?
 
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   movements     CashMovement[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
 }
 
 enum CashRegisterStatus {
@@ -307,6 +460,7 @@ enum CashRegisterStatus {
 
 model CashMovement {
   id          String           @id @default(uuid())
+  tenantId    String
   registerId  String
   type        CashMovementType
   amount      Float
@@ -314,8 +468,11 @@ model CashMovement {
   userId      String
   createdAt   DateTime         @default(now())
 
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   register    CashRegister     @relation(fields: [registerId], references: [id])
   user        User             @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
 }
 
 enum CashMovementType {
@@ -327,12 +484,11 @@ enum CashMovementType {
   CLOSING
 }
 
-
-
 // ==================== CLIENTES ====================
 
 model Customer {
   id            String    @id @default(uuid())
+  tenantId      String
   firstName     String
   lastName      String
   phone         String?
@@ -344,33 +500,38 @@ model Customer {
   totalSpent    Float     @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
 }
-
-
 
 // ==================== AUDITORÍA DE ÓRDENES ====================
 
 model OrderEvent {
   id        String   @id @default(uuid())
+  tenantId  String
   orderId   String
-  action    String   // CREATED, ITEM_ADDED, SENT_TO_KITCHEN, ITEM_PREPARING, ITEM_READY, ORDER_READY, PAID, CANCELLED
-  details   String?  // JSON or description
+  action    String
+  details   String?
   userId    String
   userName  String
   createdAt DateTime @default(now())
 
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
   @@index([orderId])
 }
 
-
-
-// ==================== CONFIGURACIÓN DEL RESTAURANTE ====================
+// ==================== CONFIGURACIÓN DEL NEGOCIO ====================
 
 model RestaurantConfig {
   id          String   @id @default("main")
-  name        String   @default("Mi Restaurante")
+  tenantId    String   @unique
+  name        String   @default("Mi Negocio")
   address     String?
   phone       String?
   rfc         String?
@@ -378,4 +539,6 @@ model RestaurantConfig {
   currency    String   @default("MXN")
   logoUrl     String?
   updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
