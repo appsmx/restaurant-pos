@@ -10,8 +10,34 @@ import kitchenRoutes from './kitchen';
 import cashRoutes from './cash';
 import customerRoutes from './customers';
 import configRoutes from './config';
+import { menuService } from '../services/menuService';
 
 const router = Router();
+
+// ==================== PUBLIC ROUTES (no auth) ====================
+
+// GET /api/public/menu — menú digital para clientes (QR)
+router.get('/public/menu', async (req, res, next) => {
+  try {
+    const categories = await menuService.getCategories();
+    res.json(categories);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/public/config — nombre del restaurante para el menú público
+router.get('/public/config', async (req, res, next) => {
+  try {
+    const { prisma } = require('../lib/prisma');
+    const config = await prisma.restaurantConfig.findUnique({ where: { id: 'main' } });
+    res.json({ name: config?.name || 'Restaurante', phone: config?.phone || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== PROTECTED ROUTES ====================
 
 router.use('/auth', authRoutes);
 router.use('/menu', menuRoutes);
