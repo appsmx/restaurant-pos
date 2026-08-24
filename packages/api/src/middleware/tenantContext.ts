@@ -1,37 +1,44 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
 import { prisma } from '../lib/prisma';
-import { runWithTenant } from '../lib/tenantContext';
+import { runWithTenant, getCurrentTenantId } from '../lib/tenantContext';
+import { ResolvedTenant } from '../lib/tenantResolver';
 
 /**
- * Tenant Context Middleware
+ * Tenant Context Middleware (Phase 2 — updated for Phase 3 compatibility)
  *
- * Resolves the tenant for the current request and wraps the entire
- * downstream handler chain inside a tenant-scoped AsyncLocalStorage context.
+ * This middleware ensures a tenant context is active for authenticated routes.
  *
- * How it resolves the tenant:
- *   1. Looks up the authenticated user's tenantId from the DB
- *      (req.userId is set by the auth middleware that runs before this)
- *   2. Sets req.tenantId for explicit access in route handlers
- *   3. Wraps `next()` inside `runWithTenant()` so all downstream code
- *      (including Prisma queries) automatically gets tenant filtering
+ * With Phase 3 (resolveTenant middleware), the tenant is already resolved
+ * from the URL BEFORE auth runs. In that case, this middleware simply validates
+ * that the authenticated user belongs to the already-resolved tenant.
  *
- * Prerequisites:
- *   - Must run AFTER the `auth` middleware (needs req.userId)
- *   - The User model must have a `tenantId` field (Phase 1 schema)
+ * Fallback behavior (Phase 2 compat): If no tenant was resolved from the URL
+ * (e.g., development mode with ALLOW_NO_TENANT=true), this middleware resolves
+ * the tenant from the authenticated user's DB record (original Phase 2 behavior).
  *
- * For public routes (no auth), use `publicTenantContext` instead,
- * which resolves tenant from slug/subdomain.
+ * Flow:
+ *   Phase 3 active:  resolveTenant → auth → tenantContext (validates user ∈ tenant)
+ *   Phase 2 compat:  auth → tenantContext (resolves tenant from user record)
  */
 
-// Extend AuthRequest to include tenantId
+// Extend AuthRequest to include tenant fields
 export interface TenantRequest extends AuthRequest {
   tenantId?: string;
+  tenant?: ResolvedTenant;
+  tenantSlug?: string;
 }
 
 /**
  * Tenant context for authenticated routes.
- * Resolves tenant from the authenticated user's record.
+ *
+ * If resolveTenant already set the tenant context (Phase 3):
+ *   - Validates that the user belongs to the resolved tenant
+ *   - Rejects with 403 if user is from a different tenant
+ *
+ * If no tenant context exists yet (Phase 2 fallback / dev mode):
+ *   - Resolves tenant from the user's tenantId in the DB
+ *   - Wraps downstream in runWithTenant()
  */
 export const tenantContext = async (
   req: TenantRequest,
@@ -40,15 +47,41 @@ export const tenantContext = async (
 ) => {
   try {
     if (!req.userId) {
-      // If no userId, auth middleware didn't run or user isn't authenticated.
-      // Let the request proceed without tenant context (will be caught by auth).
+      // No authenticated user — let auth middleware handle the rejection.
       return next();
     }
 
-    // Look up the user's tenant. We use the base query here (no extension)
-    // because we need to find the user WITHOUT tenant filtering (chicken-and-egg).
-    // The Prisma extension gracefully handles this: when no tenant context is set
-    // in AsyncLocalStorage, queries run unfiltered.
+    // Check if tenant was already resolved by resolveTenant middleware (Phase 3)
+    const alreadyResolved = getCurrentTenantId();
+
+    if (alreadyResolved) {
+      // Tenant already set from URL resolution. Validate that the user belongs
+      // to this tenant (prevents using a token from tenant A on tenant B's URL).
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { tenantId: true },
+      });
+
+      if (!user) {
+        return res.status(401).json({
+          error: 'Usuario no encontrado.',
+        });
+      }
+
+      if (user.tenantId !== alreadyResolved) {
+        return res.status(403).json({
+          error: 'No tienes acceso a este negocio.',
+          hint: 'Tu cuenta pertenece a un negocio diferente.',
+        });
+      }
+
+      // User belongs to the resolved tenant — all good, context is already active.
+      req.tenantId = alreadyResolved;
+      return next();
+    }
+
+    // Phase 2 fallback: no tenant resolved from URL (dev mode / backward compat).
+    // Resolve tenant from the user's record in the DB.
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: { tenantId: true },
@@ -61,11 +94,9 @@ export const tenantContext = async (
       });
     }
 
-    // Set tenantId on request for explicit access in route handlers
     req.tenantId = user.tenantId;
 
     // Wrap the rest of the request lifecycle in the tenant context.
-    // This makes getCurrentTenantId() available everywhere downstream.
     runWithTenant(user.tenantId, () => {
       next();
     });
@@ -81,8 +112,9 @@ export const tenantContext = async (
  * Usage in routes:
  *   router.get('/public/:slug/menu', publicTenantContext, handler)
  *
- * This will be fully implemented in Phase 3 (tenant resolution by URL/subdomain).
- * For now, it provides the interface.
+ * NOTE: With Phase 3's resolveTenant middleware running globally,
+ * this is now mostly a fallback for explicitly slug-parameterized routes.
+ * Most public routes will already have tenant context from resolveTenant.
  */
 export const publicTenantContext = async (
   req: TenantRequest,
@@ -90,6 +122,14 @@ export const publicTenantContext = async (
   next: NextFunction
 ) => {
   try {
+    // If tenant was already resolved by resolveTenant middleware, use it
+    const alreadyResolved = getCurrentTenantId();
+    if (alreadyResolved) {
+      req.tenantId = alreadyResolved;
+      return next();
+    }
+
+    // Fallback: resolve from :slug route parameter
     const slug = req.params.slug;
 
     if (!slug) {
@@ -98,7 +138,6 @@ export const publicTenantContext = async (
       });
     }
 
-    // Look up tenant by slug
     const tenant = await prisma.tenant.findUnique({
       where: { slug },
       select: { id: true, active: true },

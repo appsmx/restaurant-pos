@@ -2,12 +2,18 @@ import { prisma } from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { AppError } from '../lib/errors';
+import { getCurrentTenantId } from '../lib/tenantContext';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretposjwt';
 
 export const authService = {
   /**
    * Login con username + password (modo tradicional)
+   *
+   * Multi-tenant behavior:
+   *   - If tenant context is active (Phase 3 — resolveTenant ran before this),
+   *     findFirst automatically scopes to the tenant's users.
+   *   - JWT now includes tenantId for downstream validation.
    */
   login: async (username: string, password: string) => {
     const user = await prisma.user.findFirst({ where: { username } });
@@ -15,22 +21,31 @@ export const authService = {
     if (!user.active) throw new AppError('Usuario inactivo', 403);
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new AppError('Credenciales inválidas', 401);
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '8h' });
+
+    // Include tenantId in JWT for downstream tenant validation
+    const tenantId = getCurrentTenantId() || user.tenantId;
+    const token = jwt.sign({ userId: user.id, tenantId }, JWT_SECRET, { expiresIn: '8h' });
     await prisma.session.create({
       data: { userId: user.id, token, expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) }
     });
-    return { token, user: { id: user.id, username: user.username, name: user.name, role: user.role } };
+    return {
+      token,
+      user: { id: user.id, username: user.username, name: user.name, role: user.role },
+      tenantId,
+    };
   },
 
   /**
    * Login con PIN de 4 dígitos (modo rápido para restaurante)
+   *
+   * Multi-tenant behavior: same as login() above — scoped by Prisma extension.
    */
   loginWithPin: async (pin: string) => {
     if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       throw new AppError('El PIN debe ser de 4 dígitos', 400);
     }
 
-    // Buscar usuario por PIN (el campo pin es único)
+    // findFirst is automatically scoped to the current tenant by Prisma extension
     const user = await prisma.user.findFirst({ where: { pin } });
     if (!user) throw new AppError('PIN incorrecto', 401);
     if (!user.active) throw new AppError('Usuario inactivo', 403);
@@ -42,11 +57,17 @@ export const authService = {
     }
     // Si no hay pinHash pero sí pin match (legacy), aceptar
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '8h' });
+    // Include tenantId in JWT
+    const tenantId = getCurrentTenantId() || user.tenantId;
+    const token = jwt.sign({ userId: user.id, tenantId }, JWT_SECRET, { expiresIn: '8h' });
     await prisma.session.create({
       data: { userId: user.id, token, expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) }
     });
-    return { token, user: { id: user.id, username: user.username, name: user.name, role: user.role } };
+    return {
+      token,
+      user: { id: user.id, username: user.username, name: user.name, role: user.role },
+      tenantId,
+    };
   },
 
   /**

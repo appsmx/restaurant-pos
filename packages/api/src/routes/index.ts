@@ -67,21 +67,19 @@ router.get('/public/config', async (req, res, next) => {
 });
 
 // ==================== PROTECTED ROUTES ====================
-// Note: Each router already applies `auth` middleware internally (router.use(auth)).
-// The `tenantContext` middleware is applied INSIDE each router after auth,
-// via the auth middleware setting req.userId — then tenantContext resolves the tenant.
-// Since auth runs first (sets req.userId) and tenantContext reads the user's tenantId,
-// we apply tenantContext at the router-group level here for all protected routes.
+// The resolveTenant middleware runs globally in index.ts (before this router),
+// so tenant context is already active when we reach here.
+// Auth routes are now tenant-scoped (login is scoped to the tenant's users).
 
 import { auth } from '../middleware/auth';
 import { tenantContext } from '../middleware/tenantContext';
 
-// Auth routes don't need tenant context (login/pin need to work before tenant is known)
+// Auth routes: tenant context is already set by resolveTenant (global).
+// Login/pin will only find users within the resolved tenant.
 router.use('/auth', authRoutes);
 
-// All other protected routes get auth + tenantContext applied here.
-// This means individual routers no longer need to call router.use(auth) themselves,
-// but we keep it for backward compat (auth is idempotent — running twice is harmless).
+// All other protected routes get auth + tenantContext validation.
+// tenantContext validates that the authenticated user belongs to the resolved tenant.
 const protectedRouter = Router();
 protectedRouter.use(auth);
 protectedRouter.use(tenantContext);
