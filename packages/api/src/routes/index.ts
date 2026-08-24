@@ -10,6 +10,7 @@ import kitchenRoutes from './kitchen';
 import cashRoutes from './cash';
 import customerRoutes from './customers';
 import configRoutes from './config';
+import modifierRoutes from './modifiers';
 import { menuService } from '../services/menuService';
 
 const router = Router();
@@ -50,5 +51,6 @@ router.use('/kitchen', kitchenRoutes);
 router.use('/cash', cashRoutes);
 router.use('/customers', customerRoutes);
 router.use('/config', configRoutes);
+router.use('/modifiers', modifierRoutes);
 
 export default router;
