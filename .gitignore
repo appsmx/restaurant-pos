@@ -11,7 +11,7 @@ build/
 *.env
 
 # Prisma
-packages/api/prisma/migrations/
+# Note: migrations/ is now tracked for multi-tenant support
 
 # System
 .DS_Store
