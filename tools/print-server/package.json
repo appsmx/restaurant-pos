@@ -1,0 +1,15 @@
+{
+  "name": "pos-print-server",
+  "version": "1.0.0",
+  "description": "Servidor local de impresión para Restaurant POS — enruta tickets a impresoras por destino (cocina/barra/caja)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pdf-to-printer": "^5.4.0"
+  }
+}
