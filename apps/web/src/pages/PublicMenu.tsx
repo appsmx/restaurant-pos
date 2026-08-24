@@ -132,6 +132,14 @@ export default function PublicMenu() {
           {config.name} {config.phone ? `· ${config.phone}` : ''}
         </p>
         <p className="text-gray-700 text-xs mt-1">Precios en MXN · Sujetos a cambio</p>
+        <a
+          href="https://logancorp.vercel.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gray-700 hover:text-gray-500 text-[10px] mt-3 inline-block transition-colors"
+        >
+          ⚡ Powered by Logan
+        </a>
       </div>
     </div>
   );
