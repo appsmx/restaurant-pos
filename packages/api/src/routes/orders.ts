@@ -32,8 +32,8 @@ router.post('/', validate(createOrderSchema), async (req: AuthRequest, res, next
 router.post('/:id/items', validate(addOrderItemSchema), async (req: AuthRequest, res, next) => {
   try {
     const { id } = req.params;
-    const { productId, quantity, notes } = req.body;
-    const item = await orderService.addOrderItem(id, productId, quantity, notes, req.userId);
+    const { productId, quantity, notes, modifiers } = req.body;
+    const item = await orderService.addOrderItem(id, productId, quantity, notes, req.userId, modifiers);
     res.status(201).json(item);
   } catch (error) {
     next(error);

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
-import { useOrderStore } from '../stores/orderStore';
+import { useOrderStore, CartModifier } from '../stores/orderStore';
 import { printKitchenTicket } from '../lib/printTicket';
+import ModifierModal from '../components/ModifierModal';
 
 interface Product {
   id: string;
   name: string;
   price: number;
   description?: string;
+  hasModifiers?: boolean;
 }
 
 interface Category {
@@ -23,6 +25,7 @@ export default function MenuBrowser() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [modifierProduct, setModifierProduct] = useState<Product | null>(null);
 
   // Carrito y Mesa seleccionada (Zustand)
   const { items, addItem, removeItem, updateNotes, clearCart, getTotal, selectedTable } = useOrderStore();
@@ -44,6 +47,27 @@ export default function MenuBrowser() {
     fetchMenu();
   }, []);
 
+  const handleProductClick = (product: Product) => {
+    if (product.hasModifiers) {
+      // Open modifier selection modal
+      setModifierProduct(product);
+    } else {
+      // No modifiers — add directly to cart
+      addItem({ id: product.id, name: product.name, price: product.price });
+    }
+  };
+
+  const handleModifierConfirm = (modifiers: CartModifier[]) => {
+    if (modifierProduct) {
+      addItem(
+        { id: modifierProduct.id, name: modifierProduct.name, price: modifierProduct.price },
+        '',
+        modifiers
+      );
+      setModifierProduct(null);
+    }
+  };
+
   const handleSendToKitchen = async () => {
     if (items.length === 0) return;
     setSending(true);
@@ -58,6 +82,9 @@ export default function MenuBrowser() {
           productId: item.id,
           quantity: item.quantity,
           notes: item.notes || undefined,
+          modifiers: item.modifiers.length > 0
+            ? item.modifiers.map((m) => ({ modifierId: m.id, quantity: m.quantity }))
+            : undefined,
         });
       }
 
@@ -174,7 +201,7 @@ export default function MenuBrowser() {
                   return (
                     <button
                       key={product.id}
-                      onClick={() => addItem({ id: product.id, name: product.name, price: product.price })}
+                      onClick={() => handleProductClick(product)}
                       className={`bg-gray-800 border rounded-lg p-3 md:p-4 text-left transition-colors group relative ${
                         cartCount > 0 ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-700 hover:border-blue-500'
                       }`}
@@ -182,6 +209,11 @@ export default function MenuBrowser() {
                       {cartCount > 0 && (
                         <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
                           {cartCount}
+                        </span>
+                      )}
+                      {product.hasModifiers && (
+                        <span className="absolute -top-2 -left-2 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                          🧩
                         </span>
                       )}
                       <div className="flex-1">
@@ -234,26 +266,40 @@ export default function MenuBrowser() {
             </div>
 
             <div className="space-y-3 mb-4">
-              {items.map((item, idx) => (
-                <div key={`${item.id}-${idx}`} className="bg-gray-800 rounded-lg p-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-300 flex-1 truncate">{item.name}</span>
-                    <div className="flex items-center gap-3 ml-2">
-                      <button onClick={() => removeItem(item.id, item.notes)} className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 hover:text-red-400 font-bold">-</button>
-                      <span className="text-white w-4 text-center font-medium">{item.quantity}</span>
-                      <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price }, item.notes)} className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 hover:text-emerald-400 font-bold">+</button>
-                      <span className="text-emerald-400 font-medium w-16 text-right">${(item.price * item.quantity).toFixed(2)}</span>
+              {items.map((item, idx) => {
+                const modTotal = item.modifiers.reduce((s, m) => s + m.price * m.quantity, 0);
+                const lineTotal = (item.price + modTotal) * item.quantity;
+                return (
+                  <div key={`${item.id}-${idx}`} className="bg-gray-800 rounded-lg p-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-300 flex-1 truncate">{item.name}</span>
+                      <div className="flex items-center gap-3 ml-2">
+                        <button onClick={() => removeItem(item.id, item.notes, item.modifiers)} className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 hover:text-red-400 font-bold">-</button>
+                        <span className="text-white w-4 text-center font-medium">{item.quantity}</span>
+                        <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price }, item.notes, item.modifiers)} className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-gray-300 hover:text-emerald-400 font-bold">+</button>
+                        <span className="text-emerald-400 font-medium w-16 text-right">${lineTotal.toFixed(2)}</span>
+                      </div>
                     </div>
+                    {/* Modifiers display */}
+                    {item.modifiers.length > 0 && (
+                      <div className="mt-1.5 ml-1 space-y-0.5">
+                        {item.modifiers.map((mod) => (
+                          <p key={mod.id} className="text-xs text-amber-300">
+                            + {mod.name}{mod.price > 0 ? ` ($${mod.price.toFixed(2)})` : ''}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      value={item.notes}
+                      onChange={(e) => updateNotes(item.id, item.notes, e.target.value, item.modifiers)}
+                      className="w-full mt-2 bg-gray-900 text-gray-300 text-xs rounded-lg border border-gray-700 px-2 py-1.5 focus:border-amber-500 focus:outline-none placeholder-gray-600"
+                      placeholder="📝 Notas: sin cebolla, extra picante..."
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={item.notes}
-                    onChange={(e) => updateNotes(item.id, item.notes, e.target.value)}
-                    className="w-full mt-2 bg-gray-900 text-gray-300 text-xs rounded-lg border border-gray-700 px-2 py-1.5 focus:border-amber-500 focus:outline-none placeholder-gray-600"
-                    placeholder="📝 Notas: sin cebolla, extra picante..."
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex justify-between items-center font-bold text-lg border-t border-gray-800 pt-3 mb-4">
@@ -280,26 +326,40 @@ export default function MenuBrowser() {
             {selectedTable && <span className="text-blue-400 text-sm font-semibold">Mesa: {selectedTable.name}</span>}
           </div>
           <div className="space-y-2 max-h-40 overflow-auto mb-3">
-            {items.map((item, idx) => (
-              <div key={`${item.id}-${idx}`} className="text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300 flex-1 truncate">{item.name}</span>
-                  <div className="flex items-center gap-2 ml-2">
-                    <button onClick={() => removeItem(item.id, item.notes)} className="text-gray-500 hover:text-red-400 font-bold">-</button>
-                    <span className="text-white w-4 text-center">{item.quantity}</span>
-                    <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price }, item.notes)} className="text-gray-500 hover:text-emerald-400 font-bold">+</button>
-                    <span className="text-emerald-400 font-medium w-16 text-right">${(item.price * item.quantity).toFixed(2)}</span>
+            {items.map((item, idx) => {
+              const modTotal = item.modifiers.reduce((s, m) => s + m.price * m.quantity, 0);
+              const lineTotal = (item.price + modTotal) * item.quantity;
+              return (
+                <div key={`${item.id}-${idx}`} className="text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300 flex-1 truncate">{item.name}</span>
+                    <div className="flex items-center gap-2 ml-2">
+                      <button onClick={() => removeItem(item.id, item.notes, item.modifiers)} className="text-gray-500 hover:text-red-400 font-bold">-</button>
+                      <span className="text-white w-4 text-center">{item.quantity}</span>
+                      <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price }, item.notes, item.modifiers)} className="text-gray-500 hover:text-emerald-400 font-bold">+</button>
+                      <span className="text-emerald-400 font-medium w-16 text-right">${lineTotal.toFixed(2)}</span>
+                    </div>
                   </div>
+                  {/* Modifiers display */}
+                  {item.modifiers.length > 0 && (
+                    <div className="ml-1 mt-0.5">
+                      {item.modifiers.map((mod) => (
+                        <p key={mod.id} className="text-[11px] text-amber-300">
+                          + {mod.name}{mod.price > 0 ? ` ($${mod.price.toFixed(2)})` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    value={item.notes}
+                    onChange={(e) => updateNotes(item.id, item.notes, e.target.value, item.modifiers)}
+                    className="w-full mt-1 bg-gray-800 text-gray-400 text-xs rounded border border-gray-700 px-2 py-1 focus:border-amber-500 focus:outline-none placeholder-gray-600"
+                    placeholder="📝 sin cebolla, extra picante..."
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={item.notes}
-                  onChange={(e) => updateNotes(item.id, item.notes, e.target.value)}
-                  className="w-full mt-1 bg-gray-800 text-gray-400 text-xs rounded border border-gray-700 px-2 py-1 focus:border-amber-500 focus:outline-none placeholder-gray-600"
-                  placeholder="📝 sin cebolla, extra picante..."
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="flex justify-between items-center font-bold text-lg border-t border-gray-800 pt-2 mb-3">
             <span className="text-gray-300">Total:</span>
@@ -313,6 +373,15 @@ export default function MenuBrowser() {
             {sending ? 'Enviando...' : 'Enviar a Cocina'}
           </button>
         </div>
+      )}
+
+      {/* ==================== MODIFIER MODAL ==================== */}
+      {modifierProduct && (
+        <ModifierModal
+          product={modifierProduct}
+          onConfirm={handleModifierConfirm}
+          onCancel={() => setModifierProduct(null)}
+        />
       )}
     </div>
   );

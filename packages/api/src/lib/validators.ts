@@ -25,6 +25,10 @@ export const addOrderItemSchema = z.object({
   productId: z.string().uuid('El ID de producto debe ser un UUID válido'),
   quantity: z.number().int().positive('La cantidad debe ser al menos 1'),
   notes: z.string().optional(),
+  modifiers: z.array(z.object({
+    modifierId: z.string().uuid(),
+    quantity: z.number().int().positive().optional().default(1),
+  })).optional(),
 });
 
 export const payOrderSchema = z.object({

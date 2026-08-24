@@ -23,6 +23,7 @@ export const kitchenService = {
       },
       include: {
         product: { select: { name: true, categoryId: true, category: true } },
+        modifiers: true,
         order: {
           select: {
             id: true,
@@ -36,6 +37,19 @@ export const kitchenService = {
       },
       orderBy: { order: { createdAt: 'asc' } },
     });
+
+    // Fetch modifier names for display
+    const allModifierIds = items.flatMap((item) => item.modifiers.map((m) => m.modifierId));
+    const modifierItemsLookup: Record<string, { name: string; price: number }> = {};
+    if (allModifierIds.length > 0) {
+      const modifierRecords = await prisma.modifierItem.findMany({
+        where: { id: { in: allModifierIds } },
+        select: { id: true, name: true, price: true },
+      });
+      for (const m of modifierRecords) {
+        modifierItemsLookup[m.id] = { name: m.name, price: m.price };
+      }
+    }
 
     // Filter by destination if specified
     const BAR_CATEGORIES = ['bebidas']; // category names that go to bar (lowercase)
@@ -75,7 +89,25 @@ export const kitchenService = {
       orderMap[key].items.push(item);
     }
 
-    return Object.values(orderMap);
+    // Enrich items with resolved modifier names for display
+    const result = Object.values(orderMap).map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        notes: item.notes,
+        status: item.status,
+        product: item.product,
+        orderId: item.orderId,
+        modifiers: item.modifiers.map((m) => ({
+          name: modifierItemsLookup[m.modifierId]?.name || 'Extra',
+          price: modifierItemsLookup[m.modifierId]?.price || 0,
+          quantity: m.quantity,
+        })),
+      })),
+    }));
+
+    return result;
   },
 
   /**

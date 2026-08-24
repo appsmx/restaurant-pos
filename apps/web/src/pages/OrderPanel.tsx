@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { printTicket } from '../lib/printTicket';
 
+interface OrderItemModifier {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 interface OrderItem {
   id: string;
   quantity: number;
@@ -9,6 +16,7 @@ interface OrderItem {
   notes?: string | null;
   status: string;
   product: { name: string; price: number };
+  modifiers?: OrderItemModifier[];
 }
 
 interface Order {
@@ -270,24 +278,35 @@ export default function OrderPanel() {
                 {/* Lista de items */}
                 <div className="p-3 md:p-4 space-y-2 flex-1">
                   {order.items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm items-center">
-                      <div className="text-gray-300 flex-1">
-                        <span className="text-gray-500 mr-1">x{item.quantity}</span>
-                        <span className="line-clamp-1">{item.product.name}</span>
-                        {item.notes && <span className="text-blue-400 ml-1 text-xs">*{item.notes}</span>}
+                    <div key={item.id} className="text-sm">
+                      <div className="flex justify-between items-center">
+                        <div className="text-gray-300 flex-1">
+                          <span className="text-gray-500 mr-1">x{item.quantity}</span>
+                          <span className="line-clamp-1">{item.product.name}</span>
+                          {item.notes && <span className="text-blue-400 ml-1 text-xs">*{item.notes}</span>}
+                        </div>
+                        <div className="flex items-center gap-1 ml-2">
+                          <span className="text-gray-400 shrink-0">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                          {order.status !== 'CLOSED' && item.status === 'PENDING' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCancelItem(order.id, item.id, item.product.name); }}
+                              className="text-red-400 hover:text-red-300 text-xs ml-1"
+                              title="Quitar item"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <span className="text-gray-400 shrink-0">${(item.unitPrice * item.quantity).toFixed(2)}</span>
-                        {order.status !== 'CLOSED' && item.status === 'PENDING' && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleCancelItem(order.id, item.id, item.product.name); }}
-                            className="text-red-400 hover:text-red-300 text-xs ml-1"
-                            title="Quitar item"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
+                      {item.modifiers && item.modifiers.length > 0 && (
+                        <div className="ml-5 mt-0.5">
+                          {item.modifiers.map((mod) => (
+                            <p key={mod.id} className="text-cyan-400 text-xs">
+                              🧩 {mod.name}{mod.price > 0 ? ` (+$${mod.price.toFixed(2)})` : ''}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
