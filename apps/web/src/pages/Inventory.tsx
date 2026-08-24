@@ -165,7 +165,7 @@ export default function Inventory() {
                   <h3 className="text-white font-medium text-sm md:text-base truncate">{ingredient.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`font-bold text-lg ${getStockColor(ingredient.stock)}`}>
-                      {ingredient.stock}
+                      {Math.round(ingredient.stock * 100) / 100}
                     </span>
                     <span className="text-gray-500 text-xs">{ingredient.unit}</span>
                   </div>
@@ -261,7 +261,7 @@ export default function Inventory() {
           <div className="relative bg-gray-900 rounded-2xl p-5 w-full max-w-sm border border-gray-700">
             <h2 className="text-white font-bold text-lg mb-1">±Stock</h2>
             <p className="text-gray-400 text-sm mb-4">
-              {selectedIngredient.name} — Stock actual: <span className={getStockColor(selectedIngredient.stock)}>{selectedIngredient.stock} {selectedIngredient.unit}</span>
+              {selectedIngredient.name} — Stock actual: <span className={getStockColor(selectedIngredient.stock)}>{Math.round(selectedIngredient.stock * 100) / 100} {selectedIngredient.unit}</span>
             </p>
             <form onSubmit={handleAddMovement} className="space-y-3">
               <div>
