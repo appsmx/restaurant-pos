@@ -62,16 +62,47 @@ export default function MenuBrowser() {
 
       await apiClient(`/orders/${order.id}/send`, 'PATCH');
 
-      // Auto-imprimir comanda de cocina (sin preguntar)
+      // Determinar qué items son de barra (Bebidas) y cuáles de cocina
+      const barCategoryNames = ['bebidas']; // categorías que van a la barra
+      const productCategoryMap: Record<string, string> = {};
+      for (const cat of categories) {
+        for (const prod of cat.products) {
+          productCategoryMap[prod.id] = cat.name.toLowerCase();
+        }
+      }
+
+      const barItems = items.filter((i) => barCategoryNames.includes(productCategoryMap[i.id] || ''));
+      const kitchenItems = items.filter((i) => !barCategoryNames.includes(productCategoryMap[i.id] || ''));
+
       const user = JSON.parse(localStorage.getItem('pos_user') || '{}');
-      printKitchenTicket({
+      const baseTicket = {
         ticketNumber: order.ticketNumber || 0,
         tableName: selectedTable?.name || null,
         orderType: selectedTable ? 'DINE_IN' : 'TAKEAWAY',
         waiterName: user?.name || 'Mesero',
-        items: items.map((i) => ({ name: i.name, quantity: i.quantity })),
         createdAt: new Date().toISOString(),
-      });
+      };
+
+      // Imprimir comanda de COCINA (si hay items de comida)
+      if (kitchenItems.length > 0) {
+        printKitchenTicket({
+          ...baseTicket,
+          items: kitchenItems.map((i) => ({ name: i.name, quantity: i.quantity })),
+          destination: 'COCINA',
+        });
+      }
+
+      // Imprimir comanda de BARRA (si hay bebidas)
+      if (barItems.length > 0) {
+        // Pequeño delay para que el browser procese la primera ventana
+        setTimeout(() => {
+          printKitchenTicket({
+            ...baseTicket,
+            items: barItems.map((i) => ({ name: i.name, quantity: i.quantity })),
+            destination: 'BARRA',
+          });
+        }, 500);
+      }
 
       clearCart();
       setCartOpen(false);
