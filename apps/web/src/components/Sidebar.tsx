@@ -46,9 +46,15 @@ export default function Sidebar({ activeView, onViewChange, navItems }: SidebarP
         <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-white text-sm font-bold">
           {user?.username?.[0]?.toUpperCase() || 'A'}
         </div>
+        <span className="text-white text-[10px] font-medium text-center leading-tight mt-1 max-w-[70px] truncate">
+          {user?.name || user?.username || 'Usuario'}
+        </span>
+        <span className="text-gray-500 text-[9px] capitalize">
+          {user?.role?.toLowerCase() || ''}
+        </span>
         <button
           onClick={logout}
-          className="text-gray-500 hover:text-red-400 text-xs transition-colors"
+          className="text-gray-500 hover:text-red-400 text-xs transition-colors mt-1"
           title="Cerrar sesión"
         >
           Salir
