@@ -11,12 +11,13 @@ import Recipes from '../pages/Recipes';
 import MenuAdmin from '../pages/MenuAdmin';
 import Employees from '../pages/Employees';
 import Kitchen from '../pages/Kitchen';
+import Bar from '../pages/Bar';
 import CashRegister from '../pages/CashRegister';
 import Customers from '../pages/Customers';
 import Settings from '../pages/Settings';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'menuadmin' | 'employees' | 'kitchen' | 'cash' | 'customers' | 'settings';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'menuadmin' | 'employees' | 'kitchen' | 'bar' | 'cash' | 'customers' | 'settings';
 
 export interface NavItem {
   view: View;
@@ -30,6 +31,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'menu', label: 'Menú', icon: '📋' },
   { view: 'orders', label: 'Órdenes', icon: '🧾' },
   { view: 'kitchen', label: 'Cocina', icon: '👨‍🍳', roles: ['ADMIN', 'MANAGER', 'CHEF'] },
+  { view: 'bar', label: 'Barra', icon: '🍺', roles: ['ADMIN', 'MANAGER', 'BARTENDER'] },
   { view: 'cash', label: 'Caja', icon: '💰', roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
   { view: 'customers', label: 'Clientes', icon: '👥', roles: ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'] },
   { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'MANAGER'] },
@@ -61,6 +63,7 @@ export default function POSLayout() {
       case 'orders': return <OrderPanel />;
       case 'tips': return <Tips />;
       case 'kitchen': return <Kitchen />;
+      case 'bar': return <Bar />;
       case 'cash': return isAllowed(['ADMIN', 'MANAGER', 'CASHIER']) ? <CashRegister /> : <FloorPlan onViewChange={setActiveView} />;
       case 'customers': return <Customers />;
       case 'dashboard': return isAllowed(['ADMIN', 'MANAGER']) ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;

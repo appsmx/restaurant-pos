@@ -11,10 +11,11 @@ async function logKitchenEvent(orderId: string, action: string, details: string)
 
 export const kitchenService = {
   /**
-   * Obtener todos los items que están en cocina (SENT o PREPARING)
+   * Obtener todos los items que están en cocina/barra (SENT o PREPARING)
    * Agrupados por orden, con info de mesa y tiempo transcurrido
+   * @param destination - 'KITCHEN' (solo comida), 'BAR' (solo bebidas), undefined (todo)
    */
-  getKitchenQueue: async () => {
+  getKitchenQueue: async (destination?: string) => {
     const items = await prisma.orderItem.findMany({
       where: {
         status: { in: ['SENT', 'PREPARING'] },
@@ -36,6 +37,17 @@ export const kitchenService = {
       orderBy: { order: { createdAt: 'asc' } },
     });
 
+    // Filter by destination if specified
+    const BAR_CATEGORIES = ['bebidas']; // category names that go to bar (lowercase)
+    const filteredItems = destination
+      ? items.filter((item) => {
+          const catName = (item.product.category as any)?.name?.toLowerCase() || '';
+          if (destination === 'BAR') return BAR_CATEGORIES.includes(catName);
+          if (destination === 'KITCHEN') return !BAR_CATEGORIES.includes(catName);
+          return true;
+        })
+      : items;
+
     // Agrupar por orden
     const orderMap: Record<string, {
       orderId: string;
@@ -44,10 +56,10 @@ export const kitchenService = {
       tableName: string | null;
       waiterName: string;
       createdAt: string;
-      items: typeof items;
+      items: typeof filteredItems;
     }> = {};
 
-    for (const item of items) {
+    for (const item of filteredItems) {
       const key = item.orderId;
       if (!orderMap[key]) {
         orderMap[key] = {

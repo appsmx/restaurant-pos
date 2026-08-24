@@ -55,7 +55,10 @@ function getStatusBadge(status: string) {
   }
 }
 
-export default function Kitchen() {
+export default function Kitchen({ destination, title, icon }: { destination?: string; title?: string; icon?: string } = {}) {
+  const dest = destination || 'KITCHEN';
+  const pageTitle = title || '👨‍🍳 Cocina';
+  const pageIcon = icon || '👨‍🍳';
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [completed, setCompleted] = useState<CompletedOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +68,7 @@ export default function Kitchen() {
 
   const fetchQueue = async () => {
     try {
-      const data = await apiClient('/kitchen', 'GET');
+      const data = await apiClient(`/kitchen${dest ? `?destination=${dest}` : ''}`, 'GET');
       if (data.length > prevCount.current && prevCount.current > 0) {
         playNotificationSound();
       }
@@ -129,7 +132,7 @@ export default function Kitchen() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-5">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl md:text-2xl font-bold">👨‍🍳 Cocina</h1>
+          <h1 className="text-xl md:text-2xl font-bold">{pageTitle}</h1>
           {orders.length > 0 && (
             <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
               {orders.length} {orders.length === 1 ? 'orden' : 'órdenes'}
@@ -170,7 +173,7 @@ export default function Kitchen() {
         <>
           {orders.length === 0 ? (
             <div className="bg-gray-800 rounded-xl p-12 text-center text-gray-400">
-              <p className="text-5xl mb-3">👨‍🍳</p>
+              <p className="text-5xl mb-3">{pageIcon}</p>
               <p className="text-lg font-medium">Sin pedidos pendientes</p>
               <p className="text-sm mt-1">Los pedidos aparecerán aquí cuando se envíen desde el menú</p>
               <p className="text-xs text-gray-600 mt-3">Se actualiza automáticamente cada 10 segundos</p>
