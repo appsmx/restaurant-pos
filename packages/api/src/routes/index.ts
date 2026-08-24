@@ -11,6 +11,7 @@ import cashRoutes from './cash';
 import customerRoutes from './customers';
 import configRoutes from './config';
 import modifierRoutes from './modifiers';
+import reservationRoutes from './reservations';
 import { menuService } from '../services/menuService';
 
 const router = Router();
@@ -52,5 +53,6 @@ router.use('/cash', cashRoutes);
 router.use('/customers', customerRoutes);
 router.use('/config', configRoutes);
 router.use('/modifiers', modifierRoutes);
+router.use('/reservations', reservationRoutes);
 
 export default router;

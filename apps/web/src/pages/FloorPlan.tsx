@@ -34,6 +34,7 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [alertInfo, setAlertInfo] = useState<{ tableName: string; total: number } | null>(null);
+  const [reservedTables, setReservedTables] = useState<Record<string, { time: string; customerName: string; guests: number }>>({});
   const setSelectedTable = useOrderStore((s) => s.setSelectedTable);
 
   const showToast = (message: string) => {
@@ -53,8 +54,22 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
     }
   };
 
+  const fetchReservedTables = async () => {
+    try {
+      const data = await apiClient('/reservations/reserved-tables', 'GET');
+      const map: Record<string, { time: string; customerName: string; guests: number }> = {};
+      for (const r of data) {
+        map[r.tableId] = { time: r.time, customerName: r.customerName, guests: r.guests };
+      }
+      setReservedTables(map);
+    } catch {
+      // Silently fail — reservations are optional info
+    }
+  };
+
   useEffect(() => {
     fetchSections();
+    fetchReservedTables();
   }, []);
 
   const handleTableClick = async (table: Table) => {
@@ -132,15 +147,35 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-3">
                 {section.tables.map((table) => {
                   const config = STATUS_CONFIG[table.status] || STATUS_CONFIG.AVAILABLE;
+                  const reservation = reservedTables[table.id];
+                  const hasReservation = !!reservation && table.status !== 'OCCUPIED';
                   return (
                     <button
                       key={table.id}
                       onClick={() => handleTableClick(table)}
-                      className={`${config.bg} ${config.border} border-2 rounded-xl p-3 md:p-4 flex flex-col items-center gap-0.5 md:gap-1 hover:opacity-80 active:scale-95 transition-all cursor-pointer`}
+                      className={`${config.bg} ${config.border} border-2 rounded-xl p-3 md:p-4 flex flex-col items-center gap-0.5 md:gap-1 hover:opacity-80 active:scale-95 transition-all cursor-pointer relative`}
                     >
+                      {hasReservation && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                          📅
+                        </span>
+                      )}
                       <span className="text-white font-bold text-sm md:text-lg">{table.name}</span>
-                      <span className="text-white/70 text-[10px] md:text-xs">{table.capacity} pers.</span>
-                      <span className="text-white/50 text-[9px] md:text-[10px] uppercase tracking-wide">{config.label}</span>
+                      {hasReservation ? (
+                        <>
+                          <span className="text-amber-200 text-[10px] md:text-xs font-medium truncate max-w-full">
+                            {reservation.time} · {reservation.guests}p
+                          </span>
+                          <span className="text-amber-100/70 text-[9px] md:text-[10px] truncate max-w-full">
+                            {reservation.customerName}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-white/70 text-[10px] md:text-xs">{table.capacity} pers.</span>
+                          <span className="text-white/50 text-[9px] md:text-[10px] uppercase tracking-wide">{config.label}</span>
+                        </>
+                      )}
                     </button>
                   );
                 })}
