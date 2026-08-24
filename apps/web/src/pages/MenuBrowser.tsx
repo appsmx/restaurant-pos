@@ -62,19 +62,16 @@ export default function MenuBrowser() {
 
       await apiClient(`/orders/${order.id}/send`, 'PATCH');
 
-      // Ofrecer imprimir comanda de cocina
-      const shouldPrint = confirm('✅ ¡Orden enviada a cocina! ¿Imprimir comanda?');
-      if (shouldPrint) {
-        const user = JSON.parse(localStorage.getItem('pos_user') || '{}');
-        printKitchenTicket({
-          ticketNumber: order.ticketNumber || 0,
-          tableName: selectedTable?.name || null,
-          orderType: selectedTable ? 'DINE_IN' : 'TAKEAWAY',
-          waiterName: user?.name || 'Mesero',
-          items: items.map((i) => ({ name: i.name, quantity: i.quantity })),
-          createdAt: new Date().toISOString(),
-        });
-      }
+      // Auto-imprimir comanda de cocina (sin preguntar)
+      const user = JSON.parse(localStorage.getItem('pos_user') || '{}');
+      printKitchenTicket({
+        ticketNumber: order.ticketNumber || 0,
+        tableName: selectedTable?.name || null,
+        orderType: selectedTable ? 'DINE_IN' : 'TAKEAWAY',
+        waiterName: user?.name || 'Mesero',
+        items: items.map((i) => ({ name: i.name, quantity: i.quantity })),
+        createdAt: new Date().toISOString(),
+      });
 
       clearCart();
       setCartOpen(false);
