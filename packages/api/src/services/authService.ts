@@ -10,7 +10,7 @@ export const authService = {
    * Login con username + password (modo tradicional)
    */
   login: async (username: string, password: string) => {
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.user.findFirst({ where: { username } });
     if (!user) throw new AppError('Credenciales inválidas', 401);
     if (!user.active) throw new AppError('Usuario inactivo', 403);
     const valid = await bcrypt.compare(password, user.password);
@@ -31,7 +31,7 @@ export const authService = {
     }
 
     // Buscar usuario por PIN (el campo pin es único)
-    const user = await prisma.user.findUnique({ where: { pin } });
+    const user = await prisma.user.findFirst({ where: { pin } });
     if (!user) throw new AppError('PIN incorrecto', 401);
     if (!user.active) throw new AppError('Usuario inactivo', 403);
 
