@@ -16,9 +16,10 @@ import Bar from '../pages/Bar';
 import CashRegister from '../pages/CashRegister';
 import Customers from '../pages/Customers';
 import Settings from '../pages/Settings';
+import Reservations from '../pages/Reservations';
 import { useAuthStore } from '../stores/authStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'modifiers' | 'menuadmin' | 'employees' | 'kitchen' | 'bar' | 'cash' | 'customers' | 'settings';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'modifiers' | 'menuadmin' | 'employees' | 'kitchen' | 'bar' | 'cash' | 'customers' | 'settings' | 'reservations';
 
 export interface NavItem {
   view: View;
@@ -35,6 +36,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'bar', label: 'Barra', icon: '🍺', roles: ['ADMIN', 'MANAGER', 'BARTENDER'] },
   { view: 'cash', label: 'Caja', icon: '💰', roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
   { view: 'customers', label: 'Clientes', icon: '👥', roles: ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'] },
+  { view: 'reservations', label: 'Reservas', icon: '📅', roles: ['ADMIN', 'MANAGER', 'WAITER'] },
   { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'MANAGER'] },
   { view: 'history', label: 'Historial', icon: '📜', roles: ['ADMIN', 'MANAGER'] },
   { view: 'inventory', label: 'Inventario', icon: '📦', roles: ['ADMIN', 'MANAGER'] },
@@ -68,6 +70,7 @@ export default function POSLayout() {
       case 'bar': return <Bar />;
       case 'cash': return isAllowed(['ADMIN', 'MANAGER', 'CASHIER']) ? <CashRegister /> : <FloorPlan onViewChange={setActiveView} />;
       case 'customers': return <Customers />;
+      case 'reservations': return isAllowed(['ADMIN', 'MANAGER', 'WAITER']) ? <Reservations /> : <FloorPlan onViewChange={setActiveView} />;
       case 'dashboard': return isAllowed(['ADMIN', 'MANAGER']) ? <Dashboard /> : <FloorPlan onViewChange={setActiveView} />;
       case 'history': return isAllowed(['ADMIN', 'MANAGER']) ? <History /> : <FloorPlan onViewChange={setActiveView} />;
       case 'inventory': return isAllowed(['ADMIN', 'MANAGER']) ? <Inventory /> : <FloorPlan onViewChange={setActiveView} />;
