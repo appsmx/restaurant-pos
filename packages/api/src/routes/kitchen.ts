@@ -5,10 +5,11 @@ import { auth } from '../middleware/auth';
 const router = Router();
 router.use(auth);
 
-// GET /api/kitchen — obtener la cola de cocina (items pendientes/preparando)
+// GET /api/kitchen?destination=KITCHEN|BAR — cola filtrada por destino
 router.get('/', async (req, res, next) => {
   try {
-    const queue = await kitchenService.getKitchenQueue();
+    const destination = req.query.destination as string | undefined;
+    const queue = await kitchenService.getKitchenQueue(destination);
     res.json(queue);
   } catch (error) {
     next(error);
