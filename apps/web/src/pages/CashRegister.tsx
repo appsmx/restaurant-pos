@@ -7,7 +7,7 @@ interface CashMovement {
   amount: number;
   description: string | null;
   createdAt: string;
-  user: { name: string };
+  user?: { name: string };
 }
 
 interface RegisterSummary {
@@ -42,9 +42,12 @@ const MOVEMENT_CONFIG: Record<string, { label: string; icon: string; color: stri
 export default function CashRegister() {
   const [data, setData] = useState<RegisterSummary | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'current' | 'history'>('current');
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalType>('none');
   const [submitting, setSubmitting] = useState(false);
+  const [salesDetail, setSalesDetail] = useState<{ totalSales: number; totalTips: number; orderCount: number; byMethod: Record<string, { count: number; total: number; tips: number }> } | null>(null);
 
   // Form states
   const [openAmount, setOpenAmount] = useState('');
@@ -57,24 +60,35 @@ export default function CashRegister() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const summary = await apiClient('/cash', 'GET');
-      setData(summary);
-      if (summary?.register) {
-        const current = await apiClient('/cash', 'GET');
-        // Get movements from the full register
-        const fullRegister = await apiClient('/cash', 'GET');
-        setData(fullRegister);
+      const detail = await apiClient('/cash/shift-detail', 'GET');
+      if (detail) {
+        setData({ register: detail.register, summary: detail.summary });
+        setMovements(detail.movements || []);
+        setSalesDetail(detail.salesDetail || null);
+      } else {
+        setData(null);
+        setMovements([]);
+        setSalesDetail(null);
       }
     } catch (err) {
-      // No register open — that's ok
       setData(null);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchHistory = async () => {
+    try {
+      const hist = await apiClient('/cash/history?limit=20', 'GET');
+      setHistory(hist || []);
+    } catch {
+      setHistory([]);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchHistory();
   }, []);
 
   const handleOpenRegister = async (e: React.FormEvent) => {
@@ -233,19 +247,64 @@ export default function CashRegister() {
 
       {/* Movements list */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-700">
-          <h2 className="text-white font-semibold text-sm">Movimientos del día</h2>
+        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+          <h2 className="text-white font-semibold text-sm">Movimientos del turno</h2>
+          <span className="text-gray-500 text-xs">{movements.filter((m) => m.type !== 'OPENING').length} movimientos</span>
         </div>
-        <div className="divide-y divide-gray-700/50">
-          {data.register && (
-            <MovementRow type="OPENING" amount={data.register.openingAmount} description="Apertura de caja" time={formatTime(data.register.openedAt)} user="" />
+        <div className="divide-y divide-gray-700/50 max-h-60 overflow-auto">
+          {movements.map((mov) => (
+            <MovementRow key={mov.id} type={mov.type} amount={mov.amount} description={mov.description} time={formatTime(mov.createdAt)} user={mov.user?.name || ''} />
+          ))}
+          {movements.length === 0 && (
+            <div className="p-6 text-center text-gray-500 text-sm">Sin movimientos registrados</div>
           )}
-          {/* Additional movements would be shown here when we fetch them */}
         </div>
-        {(!data.register) && (
-          <div className="p-6 text-center text-gray-500 text-sm">Sin movimientos registrados hoy</div>
-        )}
       </div>
+
+      {/* Sales by payment method */}
+      {salesDetail && salesDetail.orderCount > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mt-4">
+          <div className="px-4 py-3 border-b border-gray-700">
+            <h2 className="text-white font-semibold text-sm">💳 Ventas por método de pago</h2>
+            <p className="text-gray-500 text-xs mt-0.5">{salesDetail.orderCount} órdenes cobradas · ${salesDetail.totalSales.toFixed(2)} total{salesDetail.totalTips > 0 ? ` + $${salesDetail.totalTips.toFixed(2)} propinas` : ''}</p>
+          </div>
+          <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+            {Object.entries(salesDetail.byMethod).map(([method, data]) => (
+              <div key={method} className="bg-gray-900 rounded-lg p-3 text-center">
+                <p className="text-sm mb-0.5">{method === 'CASH' ? '💵' : method === 'CARD' ? '💳' : method === 'TRANSFER' ? '📲' : '🔄'}</p>
+                <p className="text-white font-bold text-sm">${data.total.toFixed(2)}</p>
+                <p className="text-gray-500 text-[10px]">{data.count} {data.count === 1 ? 'pago' : 'pagos'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* History Section */}
+      {history.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mt-4">
+          <div className="px-4 py-3 border-b border-gray-700">
+            <h2 className="text-white font-semibold text-sm">📜 Turnos anteriores</h2>
+          </div>
+          <div className="divide-y divide-gray-700/50 max-h-48 overflow-auto">
+            {history.slice(0, 5).map((reg: any) => (
+              <div key={reg.id} className="px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-white text-sm font-medium">
+                    {new Date(reg.openedAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })} — {new Date(reg.openedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} a {reg.closedAt ? new Date(reg.closedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '?'}
+                  </p>
+                  <p className="text-gray-500 text-xs">
+                    Apertura: ${reg.openingAmount?.toFixed(2)} · Esperado: ${reg.expectedAmount?.toFixed(2)} · Cierre: ${reg.closingAmount?.toFixed(2)}
+                  </p>
+                </div>
+                <span className={`text-sm font-bold ${reg.difference === 0 ? 'text-emerald-400' : reg.difference > 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                  {reg.difference === 0 ? '✓ Cuadra' : reg.difference > 0 ? `+$${reg.difference?.toFixed(2)}` : `-$${Math.abs(reg.difference)?.toFixed(2)}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Modal: Cerrar caja */}
       {modal === 'close' && (

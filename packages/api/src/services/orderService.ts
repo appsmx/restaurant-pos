@@ -308,6 +308,24 @@ export const orderService = {
       emitTableStatusChanged({ tableId: order.tableId, status: 'AVAILABLE', tableName });
     }
 
+    // 7. Auto-register SALE movement in cash register (if open and method is CASH)
+    if (method === 'CASH') {
+      try {
+        const openRegister = await prisma.cashRegister.findFirst({ where: { status: 'OPEN' } });
+        if (openRegister) {
+          await prisma.cashMovement.create({
+            data: {
+              registerId: openRegister.id,
+              type: 'SALE',
+              amount: finalTotal,
+              description: `Orden #${closedOrder.ticketNumber} — Efectivo`,
+              userId,
+            },
+          });
+        }
+      } catch { /* Never block payment for cash movement failure */ }
+    }
+
     return closedOrder;
   },
 

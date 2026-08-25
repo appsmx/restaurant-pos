@@ -77,4 +77,14 @@ router.get('/history', async (req: AuthRequest, res, next) => {
   }
 });
 
+// GET /api/cash/shift-detail — resumen detallado del turno actual con desglose por método
+router.get('/shift-detail', async (req: AuthRequest, res, next) => {
+  try {
+    const detail = await cashService.getShiftDetail();
+    res.json(detail);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
