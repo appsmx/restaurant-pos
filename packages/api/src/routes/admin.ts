@@ -188,6 +188,7 @@ router.post('/tenants', async (req: Request, res: Response, next: NextFunction) 
       // 2. Create business config
       await tx.restaurantConfig.create({
         data: {
+          id: tenant.id, // Use tenant ID as config ID (1:1 relationship)
           tenantId: tenant.id,
           name,
           phone: phone || null,
