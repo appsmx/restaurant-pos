@@ -26,7 +26,7 @@ export const userService = {
    */
   createUser: async (data: { username: string; password: string; name: string; role: string }) => {
     // Verificar que el username no exista
-    const existing = await prisma.user.findUnique({ where: { username: data.username } });
+    const existing = await prisma.user.findFirst({ where: { username: data.username } });
     if (existing) {
       throw new AppError('El nombre de usuario ya está en uso', 409);
     }
