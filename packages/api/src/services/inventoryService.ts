@@ -168,23 +168,41 @@ export const inventoryService = {
       }
     }
 
-    // Ejecutar descuentos en batch
+    // Ejecutar descuentos en batch (nunca dejar stock negativo)
     if (deductions.length > 0) {
-      const operations = deductions.map((d) => [
-        prisma.stockMovement.create({
-          data: {
-            ingredientId: d.ingredientId,
-            type: 'OUT',
-            quantity: d.quantity,
-            reason: `Venta - Orden ${orderId.slice(0, 8)}`,
-            userId,
-          },
-        }),
-        prisma.ingredient.update({
-          where: { id: d.ingredientId },
-          data: { stock: { decrement: d.quantity } },
-        }),
-      ]).flat();
+      // Fetch current stock levels for all affected ingredients
+      const ingredientIds = [...new Set(deductions.map((d) => d.ingredientId))];
+      const currentIngredients = await prisma.ingredient.findMany({
+        where: { id: { in: ingredientIds } },
+        select: { id: true, stock: true },
+      });
+      const stockMap: Record<string, number> = {};
+      for (const ing of currentIngredients) {
+        stockMap[ing.id] = ing.stock;
+      }
+
+      const operations = deductions.map((d) => {
+        const currentStock = stockMap[d.ingredientId] || 0;
+        const newStock = Math.max(0, currentStock - d.quantity);
+        // Track consumed amount in stockMap for multiple deductions of same ingredient
+        stockMap[d.ingredientId] = newStock;
+
+        return [
+          prisma.stockMovement.create({
+            data: {
+              ingredientId: d.ingredientId,
+              type: 'OUT',
+              quantity: d.quantity,
+              reason: `Venta - Orden ${orderId.slice(0, 8)}`,
+              userId,
+            },
+          }),
+          prisma.ingredient.update({
+            where: { id: d.ingredientId },
+            data: { stock: newStock },
+          }),
+        ];
+      }).flat();
 
       await prisma.$transaction(operations);
     }
