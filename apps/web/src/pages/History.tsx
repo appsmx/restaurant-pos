@@ -37,7 +37,7 @@ interface OrderDetailData {
   table: { name: string } | null;
   user: { id: string; name: string; role: string };
   closedBy: { id: string; name: string; role: string } | null;
-  items: { id: string; quantity: number; unitPrice: number; notes: string | null; product: { name: string } }[];
+  items: { id: string; quantity: number; unitPrice: number; notes: string | null; product: { name: string }; modifiers?: { id: string; name: string; price: number; quantity: number }[] }[];
   payments: { method: string; amount: number; tip: number; createdAt: string; user?: { name: string } }[];
   events: { id: string; action: string; details: string | null; userName: string; createdAt: string }[];
 }
@@ -189,9 +189,21 @@ export default function History() {
               <h2 className="text-white font-semibold text-sm mb-2">🧾 Productos</h2>
               <div className="space-y-1 text-sm">
                 {detail.items.map((item) => (
-                  <div key={item.id} className="flex justify-between">
-                    <span className="text-white">{item.quantity}x {item.product.name}</span>
-                    <span className="text-gray-400 font-mono">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                  <div key={item.id}>
+                    <div className="flex justify-between">
+                      <span className="text-white">{item.quantity}x {item.product.name}</span>
+                      <span className="text-gray-400 font-mono">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                    </div>
+                    {item.modifiers && item.modifiers.length > 0 && (
+                      <div className="ml-5 space-y-0">
+                        {item.modifiers.map((mod) => (
+                          <p key={mod.id} className="text-cyan-400 text-xs">
+                            🧩 {mod.name}{mod.price > 0 ? ` (+$${mod.price.toFixed(2)})` : ''}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {item.notes && <p className="text-amber-400 text-xs ml-5">📝 {item.notes}</p>}
                   </div>
                 ))}
                 <div className="border-t border-gray-700 pt-2 mt-2">
@@ -345,7 +357,11 @@ export default function History() {
                     {order.items.map((i) => `${i.quantity}x ${i.product.name}`).join(', ')}
                   </p>
                   <div className="flex items-center gap-2 shrink-0 text-xs text-gray-500">
-                    {order.payments[0] && <span>{METHOD_ICONS[order.payments[0].method]}</span>}
+                    {order.payments[0] && (
+                      <span className="text-gray-400">
+                        {METHOD_ICONS[order.payments[0].method]} {METHOD_LABELS[order.payments[0].method] || order.payments[0].method}
+                      </span>
+                    )}
                     <span>{formatDate(order.closedAt)}</span>
                     <span>{formatTime(order.closedAt)}</span>
                     <span className="text-blue-400 hidden sm:inline">→</span>
