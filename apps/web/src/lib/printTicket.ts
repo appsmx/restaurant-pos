@@ -6,7 +6,7 @@ interface TicketData {
   date: string;
   waiterName: string;
   tableName: string | null;
-  items: { name: string; quantity: number; unitPrice: number }[];
+  items: { name: string; quantity: number; unitPrice: number; modifiers?: { name: string; price: number }[] }[];
   subtotal: number;
   taxRate: number;
   tax: number;
@@ -87,6 +87,11 @@ export function printTicket(data: TicketData) {
         <span>${item.quantity}x ${item.name}</span>
         <span>$${(item.quantity * item.unitPrice).toFixed(2)}</span>
       </div>
+      ${item.modifiers && item.modifiers.length > 0 ? item.modifiers.map(m => `
+        <div style="margin-left: 15px; font-size: 10px; color: #666;">
+          + ${m.name}${m.price > 0 ? ` ($${m.price.toFixed(2)})` : ''}
+        </div>
+      `).join('') : ''}
     `).join('')}
   </div>
   
