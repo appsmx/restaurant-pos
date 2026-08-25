@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { printTicket } from '../lib/printTicket';
+import { getSocket } from '../lib/socket';
 
 interface OrderItemModifier {
   id: string;
@@ -119,8 +120,25 @@ export default function OrderPanel() {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 30000);
-    return () => clearInterval(interval);
+    // Fallback polling every 60s (socket handles instant updates)
+    const interval = setInterval(fetchOrders, 60000);
+
+    // Socket.IO: refresh orders on relevant events
+    const socket = getSocket();
+    const handleRefresh = () => { fetchOrders(); };
+
+    socket.on('order:sent', handleRefresh);
+    socket.on('item:statusChanged', handleRefresh);
+    socket.on('order:ready', handleRefresh);
+    socket.on('order:closed', handleRefresh);
+
+    return () => {
+      clearInterval(interval);
+      socket.off('order:sent', handleRefresh);
+      socket.off('item:statusChanged', handleRefresh);
+      socket.off('order:ready', handleRefresh);
+      socket.off('order:closed', handleRefresh);
+    };
   }, []);
 
   const openPayModal = (order: Order) => {

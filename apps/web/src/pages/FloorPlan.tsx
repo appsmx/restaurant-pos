@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { useOrderStore } from '../stores/orderStore';
+import { getSocket } from '../lib/socket';
 import { View } from '../components/POSLayout';
 
 interface Table {
@@ -70,6 +71,21 @@ export default function FloorPlan({ onViewChange }: FloorPlanProps) {
   useEffect(() => {
     fetchSections();
     fetchReservedTables();
+
+    // Socket.IO: refresh floor plan when table status changes
+    const socket = getSocket();
+    const handleTableChange = () => { fetchSections(); };
+    const handleOrderClosed = () => { fetchSections(); };
+
+    socket.on('table:statusChanged', handleTableChange);
+    socket.on('order:closed', handleOrderClosed);
+    socket.on('order:sent', handleTableChange);
+
+    return () => {
+      socket.off('table:statusChanged', handleTableChange);
+      socket.off('order:closed', handleOrderClosed);
+      socket.off('order:sent', handleTableChange);
+    };
   }, []);
 
   const handleTableClick = async (table: Table) => {

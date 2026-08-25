@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { initSocket } from './lib/socket';
 
 dotenv.config();
 
@@ -43,6 +45,11 @@ app.use('/api', routes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+// Create HTTP server and attach Socket.IO
+const httpServer = createServer(app);
+initSocket(httpServer, allowedOrigins);
+
+httpServer.listen(PORT, () => {
   console.log(`🚀 POS API corriendo en puerto ${PORT}`);
+  console.log(`🔌 WebSocket activo`);
 });

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { apiClient } from '../lib/apiClient';
+import { getSocket } from '../lib/socket';
 
 interface KitchenItemModifier {
   name: string;
@@ -100,9 +101,27 @@ export default function Kitchen({ destination, title, icon }: { destination?: st
   useEffect(() => {
     fetchQueue();
     fetchCompleted();
-    const interval = setInterval(() => { fetchQueue(); fetchCompleted(); }, 10000);
+    // Fallback polling every 30s (socket handles instant updates)
+    const interval = setInterval(() => { fetchQueue(); fetchCompleted(); }, 30000);
     const timerInterval = setInterval(() => setTick((t) => t + 1), 30000);
-    return () => { clearInterval(interval); clearInterval(timerInterval); };
+
+    // Socket.IO: listen for real-time events
+    const socket = getSocket();
+    const handleOrderSent = () => { fetchQueue(); playNotificationSound(); };
+    const handleItemChanged = () => { fetchQueue(); fetchCompleted(); };
+    const handleOrderReady = () => { fetchQueue(); fetchCompleted(); };
+
+    socket.on('order:sent', handleOrderSent);
+    socket.on('item:statusChanged', handleItemChanged);
+    socket.on('order:ready', handleOrderReady);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(timerInterval);
+      socket.off('order:sent', handleOrderSent);
+      socket.off('item:statusChanged', handleItemChanged);
+      socket.off('order:ready', handleOrderReady);
+    };
   }, []);
 
   const handleStartPreparing = async (itemId: string) => {
