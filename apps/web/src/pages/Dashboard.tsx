@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import DrilldownModal, { DrilldownFilters } from '../components/DrilldownModal';
 
 interface Summary {
   period: string;
@@ -58,10 +59,11 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [employees, setEmployees] = useState<EmployeeReport>({ creators: [], cashiers: [] });
   const [products, setProducts] = useState<ProductSales[]>([]);
-  const [dailyData, setDailyData] = useState<{ date: string; sales: number; orders: number }[]>([]);
+  const [dailyData, setDailyData] = useState<{ date: string; sales: number; orders: number; rawDate: string }[]>([]);
   const [stockAlerts, setStockAlerts] = useState<{ id: string; name: string; stock: number; unit: string; severity: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [drilldown, setDrilldown] = useState<DrilldownFilters | null>(null);
 
   const fetchData = async () => {
     try {
@@ -193,9 +195,10 @@ export default function Dashboard() {
           {/* Bar chart: ventas por día */}
           {dailyData.length > 0 && (
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-              <h2 className="text-white font-semibold text-sm mb-4">📈 Ventas últimos 7 días</h2>
+              <h2 className="text-white font-semibold text-sm mb-1">📈 Ventas últimos 7 días</h2>
+              <p className="text-gray-500 text-xs mb-3">Haz clic en una barra para ver las órdenes de ese día</p>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={dailyData}>
+                <BarChart data={dailyData} style={{ cursor: 'pointer' }}>
                   <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
                   <Tooltip
@@ -203,7 +206,17 @@ export default function Dashboard() {
                     labelStyle={{ color: '#fff' }}
                     formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
                   />
-                  <Bar dataKey="sales" fill="#10b981" radius={[6, 6, 0, 0]} />
+                  <Bar
+                    dataKey="sales"
+                    fill="#10b981"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: any) => {
+                      if (data && data.rawDate) {
+                        setDrilldown({ title: `Órdenes del ${data.date}`, date: data.rawDate });
+                      }
+                    }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -212,7 +225,8 @@ export default function Dashboard() {
           {/* Pie chart: métodos de pago */}
           {Object.keys(summary.paymentMethods).length > 0 && (
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-              <h2 className="text-white font-semibold text-sm mb-4">💳 Métodos de pago</h2>
+              <h2 className="text-white font-semibold text-sm mb-1">💳 Métodos de pago</h2>
+              <p className="text-gray-500 text-xs mb-3">Clic en un segmento para ver órdenes con ese método</p>
               <div className="flex items-center justify-center">
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
@@ -220,6 +234,7 @@ export default function Dashboard() {
                       data={Object.entries(summary.paymentMethods).map(([method, data]) => ({
                         name: METHOD_LABELS[method] || method,
                         value: data.total,
+                        method,
                       }))}
                       cx="50%"
                       cy="50%"
@@ -227,6 +242,12 @@ export default function Dashboard() {
                       dataKey="value"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
+                      cursor="pointer"
+                      onClick={(data: any) => {
+                        if (data && data.method) {
+                          setDrilldown({ title: `Órdenes pagadas con ${METHOD_LABELS[data.method] || data.method}`, paymentMethod: data.method, period });
+                        }
+                      }}
                     >
                       {Object.keys(summary.paymentMethods).map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -255,7 +276,11 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {employees.creators.map((emp, i) => (
-                  <div key={emp.id} className="flex items-center gap-3">
+                  <div
+                    key={emp.id}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-700/30 rounded-lg p-1 -m-1 transition-colors"
+                    onClick={() => setDrilldown({ title: `Órdenes de ${emp.name} (mesero)`, employeeId: emp.id, period, role: 'creator' })}
+                  >
                     <span className="text-gray-500 text-xs font-mono w-5 shrink-0">#{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -293,7 +318,11 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {employees.cashiers.map((emp, i) => (
-                  <div key={emp.id} className="flex items-center gap-3">
+                  <div
+                    key={emp.id}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-700/30 rounded-lg p-1 -m-1 transition-colors"
+                    onClick={() => setDrilldown({ title: `Cobros de ${emp.name} (cajero)`, employeeId: emp.id, period, role: 'cashier' })}
+                  >
                     <span className="text-gray-500 text-xs font-mono w-5 shrink-0">#{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -331,7 +360,11 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {products.slice(0, 8).map((prod, i) => (
-                  <div key={prod.id} className="flex items-center gap-3">
+                  <div
+                    key={prod.id}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-700/30 rounded-lg p-1 -m-1 transition-colors"
+                    onClick={() => setDrilldown({ title: `Órdenes con "${prod.name}"`, productId: prod.id, period })}
+                  >
                     <span className="text-gray-500 text-xs font-mono w-5 shrink-0">#{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -367,7 +400,11 @@ export default function Dashboard() {
           <div className="p-3 md:p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {Object.entries(summary.paymentMethods).map(([method, data]) => (
-                <div key={method} className="bg-gray-900 rounded-lg p-3 text-center">
+                <div
+                  key={method}
+                  className="bg-gray-900 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => setDrilldown({ title: `Órdenes pagadas con ${METHOD_LABELS[method] || method}`, paymentMethod: method, period })}
+                >
                   <p className="text-lg mb-1">{METHOD_LABELS[method] || method}</p>
                   <p className="text-white font-bold text-sm">${data.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
                   <p className="text-gray-500 text-xs mt-0.5">{data.count} {data.count === 1 ? 'pago' : 'pagos'}</p>
@@ -376,6 +413,11 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Drilldown Modal */}
+      {drilldown && (
+        <DrilldownModal filters={drilldown} onClose={() => setDrilldown(null)} />
       )}
     </div>
   );

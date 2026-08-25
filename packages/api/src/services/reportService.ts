@@ -239,7 +239,7 @@ export const reportService = {
    * Ventas por día (para gráfica de barras) — últimos 7 días
    */
   getDailyBreakdown: async () => {
-    const days: { date: string; sales: number; orders: number }[] = [];
+    const days: { date: string; rawDate: string; sales: number; orders: number }[] = [];
     const now = new Date();
 
     for (let i = 6; i >= 0; i--) {
@@ -257,11 +257,97 @@ export const reportService = {
 
       days.push({
         date: dayStart.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' }),
+        rawDate: dayStart.toISOString().split('T')[0],
         sales: Math.round(totalSales * 100) / 100,
         orders: closedOrders.length,
       });
     }
 
     return days;
+  },
+
+  /**
+   * Drill-down: obtener las órdenes que forman una estadística específica
+   * Filtros: date (fecha exacta), productId, employeeId, paymentMethod, period
+   */
+  getDrilldown: async (filters: {
+    date?: string;
+    productId?: string;
+    employeeId?: string;
+    paymentMethod?: string;
+    period?: string;
+    from?: string;
+    to?: string;
+    role?: 'creator' | 'cashier';
+  }) => {
+    const where: any = { status: 'CLOSED' };
+
+    // Period-based date filter
+    if (filters.date) {
+      const start = new Date(filters.date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(filters.date);
+      end.setHours(23, 59, 59, 999);
+      where.closedAt = { gte: start, lte: end };
+    } else if (filters.from || filters.to) {
+      where.closedAt = {};
+      if (filters.from) where.closedAt.gte = new Date(filters.from);
+      if (filters.to) where.closedAt.lte = new Date(filters.to + 'T23:59:59.999Z');
+    } else if (filters.period) {
+      const now = new Date();
+      if (filters.period === 'today') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        where.closedAt = { gte: start };
+      } else if (filters.period === 'week') {
+        const start = new Date(now);
+        start.setDate(start.getDate() - 7);
+        where.closedAt = { gte: start };
+      } else if (filters.period === 'month') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        where.closedAt = { gte: start };
+      }
+    }
+
+    // Employee filter
+    if (filters.employeeId) {
+      if (filters.role === 'cashier') {
+        where.closedById = filters.employeeId;
+      } else {
+        where.userId = filters.employeeId;
+      }
+    }
+
+    // Payment method filter — needs to join with payments
+    if (filters.paymentMethod) {
+      where.payments = { some: { method: filters.paymentMethod } };
+    }
+
+    // Product filter — needs to join with items
+    if (filters.productId) {
+      where.items = { some: { productId: filters.productId } };
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+        table: { select: { name: true } },
+        user: { select: { name: true } },
+        closedBy: { select: { name: true } },
+        payments: { select: { method: true, amount: true, tip: true } },
+      },
+      orderBy: { closedAt: 'desc' },
+      take: 50, // Max 50 orders for drill-down
+    });
+
+    const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
+
+    return {
+      orders,
+      summary: {
+        count: orders.length,
+        totalSales: Math.round(totalSales * 100) / 100,
+      },
+    };
   },
 };
