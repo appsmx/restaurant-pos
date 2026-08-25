@@ -56,7 +56,10 @@ const extendedPrisma = basePrisma.$extends({
       async create({ model, args, query }) {
         if (shouldFilter(model)) {
           const tenantId = getCurrentTenantId();
-          if (tenantId) (args.data as any).tenantId = tenantId;
+          // Only inject if tenantId is not already explicitly set in the data
+          if (tenantId && !(args.data as any).tenantId) {
+            (args.data as any).tenantId = tenantId;
+          }
         }
         return query(args);
       },
@@ -65,9 +68,14 @@ const extendedPrisma = basePrisma.$extends({
           const tenantId = getCurrentTenantId();
           if (tenantId) {
             if (Array.isArray(args.data)) {
-              args.data = args.data.map((item: any) => ({ ...item, tenantId }));
+              args.data = args.data.map((item: any) => ({
+                ...item,
+                tenantId: item.tenantId || tenantId, // Don't overwrite explicit tenantId
+              }));
             } else {
-              (args.data as any).tenantId = tenantId;
+              if (!(args.data as any).tenantId) {
+                (args.data as any).tenantId = tenantId;
+              }
             }
           }
         }
