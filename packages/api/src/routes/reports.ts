@@ -149,6 +149,26 @@ router.get('/export', async (req: AuthRequest, res, next) => {
   }
 });
 
+// GET /api/reports/drilldown?date=2026-08-25&productId=xx&employeeId=xx&paymentMethod=CASH&period=today&role=creator
+router.get('/drilldown', async (req: AuthRequest, res, next) => {
+  try {
+    const { date, productId, employeeId, paymentMethod, period, from, to, role } = req.query;
+    const result = await reportService.getDrilldown({
+      date: date as string | undefined,
+      productId: productId as string | undefined,
+      employeeId: employeeId as string | undefined,
+      paymentMethod: paymentMethod as string | undefined,
+      period: period as string | undefined,
+      from: from as string | undefined,
+      to: to as string | undefined,
+      role: role as 'creator' | 'cashier' | undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/reports/order/:id — detalle completo de una orden (para timeline)
 router.get('/order/:id', async (req: AuthRequest, res, next) => {
   try {
