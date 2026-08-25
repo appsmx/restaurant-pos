@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { inventoryService } from './inventoryService';
+import { emitOrderSentToKitchen, emitOrderClosed, emitTableStatusChanged } from '../lib/socket';
 
 // ==================== HELPER: Log order event ====================
 
@@ -140,6 +141,17 @@ export const orderService = {
       const itemsSummary = pendingItems.map((i) => `${i.quantity}x ${i.product.name}`).join(', ');
       await logEvent(orderId, 'SENT_TO_KITCHEN', userId, user?.name || 'Sistema', `Enviado a cocina: ${itemsSummary}`);
     }
+
+    // WebSocket: notify kitchen/bar screens
+    const orderForSocket = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { ticketNumber: true, table: { select: { name: true } } },
+    });
+    emitOrderSentToKitchen({
+      orderId,
+      ticketNumber: orderForSocket?.ticketNumber || 0,
+      tableName: orderForSocket?.table?.name || undefined,
+    });
 
     return updatedOrder;
   },
@@ -288,6 +300,13 @@ export const orderService = {
       payDetails += ` + Propina: $${tipAmount.toFixed(2)}`;
     }
     await logEvent(orderId, 'PAID', userId, user?.name || 'Cajero', payDetails);
+
+    // WebSocket: notify order closed + table freed
+    emitOrderClosed({ orderId, ticketNumber: closedOrder.ticketNumber, tableId: order.tableId || undefined });
+    if (order.tableId) {
+      const tableName = closedOrder.table?.name || '';
+      emitTableStatusChanged({ tableId: order.tableId, status: 'AVAILABLE', tableName });
+    }
 
     return closedOrder;
   },

@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { emitItemStatusChanged, emitOrderReady } from '../lib/socket';
 
 async function logKitchenEvent(orderId: string, action: string, details: string) {
   try {
@@ -127,6 +128,9 @@ export const kitchenService = {
     // Log event
     await logKitchenEvent(item.orderId, 'ITEM_PREPARING', `Preparando: ${updated.product.name}`);
 
+    // WebSocket: notify item status change
+    emitItemStatusChanged({ orderId: item.orderId, itemId, status: 'PREPARING', productName: updated.product.name });
+
     // Si todos los items de la orden están en PREPARING o más, actualizar la orden
     const orderItems = await prisma.orderItem.findMany({ where: { orderId: item.orderId } });
     const allPreparing = orderItems.every((oi) => ['PREPARING', 'READY', 'DELIVERED'].includes(oi.status));
@@ -156,11 +160,20 @@ export const kitchenService = {
     // Log event
     await logKitchenEvent(item.orderId, 'ITEM_READY', `Listo: ${updated.product.name}`);
 
+    // WebSocket: notify item ready
+    emitItemStatusChanged({ orderId: item.orderId, itemId, status: 'READY', productName: updated.product.name });
+
     // Si todos los items de la orden están READY o más, actualizar la orden
     const orderItems = await prisma.orderItem.findMany({ where: { orderId: item.orderId } });
     const allReady = orderItems.every((oi) => ['READY', 'DELIVERED'].includes(oi.status));
     if (allReady) {
       await prisma.order.update({ where: { id: item.orderId }, data: { status: 'READY' } });
+      // WebSocket: notify entire order is ready
+      const order = await prisma.order.findUnique({
+        where: { id: item.orderId },
+        select: { ticketNumber: true, table: { select: { name: true } } },
+      });
+      emitOrderReady({ orderId: item.orderId, ticketNumber: order?.ticketNumber || 0, tableName: order?.table?.name || undefined });
     }
 
     return updated;
@@ -215,7 +228,12 @@ export const kitchenService = {
     const allReady = allItems.every((oi) => ['READY', 'DELIVERED'].includes(oi.status));
     if (allReady) {
       await prisma.order.update({ where: { id: orderId }, data: { status: 'READY' } });
+      // WebSocket: notify entire order is ready
+      emitOrderReady({ orderId, ticketNumber: order.ticketNumber, tableName: undefined });
     }
+
+    // WebSocket: notify item changes regardless
+    emitItemStatusChanged({ orderId, itemId: 'all', status: 'READY', productName: 'Toda la orden' });
 
     return { success: true };
   },
