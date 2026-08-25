@@ -161,13 +161,96 @@ export const cashService = {
   },
 
   /**
-   * Historial de cajas cerradas
+   * Historial de cajas cerradas con desglose
    */
   getHistory: async (limit: number = 10) => {
-    return prisma.cashRegister.findMany({
+    const registers = await prisma.cashRegister.findMany({
       where: { status: 'CLOSED' },
       orderBy: { closedAt: 'desc' },
       take: limit,
+      include: {
+        movements: { orderBy: { createdAt: 'asc' } },
+      },
     });
+
+    return registers.map((reg) => {
+      const summary = { opening: 0, sales: 0, deposits: 0, withdrawals: 0, expenses: 0 };
+      for (const mov of reg.movements) {
+        switch (mov.type) {
+          case 'OPENING': summary.opening += mov.amount; break;
+          case 'SALE': summary.sales += mov.amount; break;
+          case 'DEPOSIT': summary.deposits += mov.amount; break;
+          case 'WITHDRAWAL': summary.withdrawals += mov.amount; break;
+          case 'EXPENSE': summary.expenses += mov.amount; break;
+        }
+      }
+      return { ...reg, movementSummary: summary, movementCount: reg.movements.length - 2 }; // exclude OPENING and CLOSING
+    });
+  },
+
+  /**
+   * Resumen detallado del turno actual (con desglose por método de pago)
+   * Usa la tabla Payment para calcular ventas por método durante el período de la caja abierta
+   */
+  getShiftDetail: async () => {
+    const register = await prisma.cashRegister.findFirst({
+      where: { status: 'OPEN' },
+      include: {
+        movements: {
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { name: true } } },
+        },
+      },
+    });
+    if (!register) return null;
+
+    // Get payments made during this shift (since register opened)
+    const payments = await prisma.payment.findMany({
+      where: {
+        createdAt: { gte: register.openedAt },
+        status: 'COMPLETED',
+      },
+      include: {
+        order: { select: { ticketNumber: true } },
+      },
+    });
+
+    // Breakdown by method
+    const byMethod: Record<string, { count: number; total: number; tips: number }> = {};
+    for (const p of payments) {
+      if (!byMethod[p.method]) byMethod[p.method] = { count: 0, total: 0, tips: 0 };
+      byMethod[p.method].count++;
+      byMethod[p.method].total += p.amount;
+      byMethod[p.method].tips += p.tip;
+    }
+
+    // Movement summary
+    const summary = { opening: 0, sales: 0, deposits: 0, withdrawals: 0, expenses: 0, currentTotal: 0 };
+    for (const mov of register.movements) {
+      switch (mov.type) {
+        case 'OPENING': summary.opening += mov.amount; break;
+        case 'SALE': summary.sales += mov.amount; break;
+        case 'DEPOSIT': summary.deposits += mov.amount; break;
+        case 'WITHDRAWAL': summary.withdrawals += mov.amount; break;
+        case 'EXPENSE': summary.expenses += mov.amount; break;
+      }
+    }
+    summary.currentTotal = summary.opening + summary.sales + summary.deposits - summary.withdrawals - summary.expenses;
+
+    const totalSales = payments.reduce((s, p) => s + p.amount, 0);
+    const totalTips = payments.reduce((s, p) => s + p.tip, 0);
+    const orderCount = payments.length;
+
+    return {
+      register,
+      summary,
+      movements: register.movements,
+      salesDetail: {
+        totalSales,
+        totalTips,
+        orderCount,
+        byMethod,
+      },
+    };
   },
 };
