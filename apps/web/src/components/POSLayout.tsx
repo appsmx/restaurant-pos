@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import FloorPlan from '../pages/FloorPlan';
 import MenuBrowser from '../pages/MenuBrowser';
@@ -18,6 +18,7 @@ import Customers from '../pages/Customers';
 import Settings from '../pages/Settings';
 import Reservations from '../pages/Reservations';
 import { useAuthStore } from '../stores/authStore';
+import { useTenantStore } from '../stores/tenantStore';
 
 export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'modifiers' | 'menuadmin' | 'employees' | 'kitchen' | 'bar' | 'cash' | 'customers' | 'settings' | 'reservations';
 
@@ -26,25 +27,32 @@ export interface NavItem {
   label: string;
   icon: string;
   roles?: string[];
+  /** Module ID that must be enabled for this nav item to show */
+  moduleId?: string;
 }
 
+/**
+ * Navigation items with module mapping.
+ * Items with a moduleId will only show if that module is enabled for the tenant.
+ * Items without moduleId are always shown (core functionality).
+ */
 const ALL_NAV_ITEMS: NavItem[] = [
-  { view: 'floorplan', label: 'Mesas', icon: '🏗️' },
-  { view: 'menu', label: 'Menú', icon: '📋' },
-  { view: 'orders', label: 'Órdenes', icon: '🧾' },
-  { view: 'kitchen', label: 'Cocina', icon: '👨‍🍳', roles: ['ADMIN', 'MANAGER', 'CHEF'] },
-  { view: 'bar', label: 'Barra', icon: '🍺', roles: ['ADMIN', 'MANAGER', 'BARTENDER'] },
-  { view: 'cash', label: 'Caja', icon: '💰', roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
-  { view: 'customers', label: 'Clientes', icon: '👥', roles: ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'] },
-  { view: 'reservations', label: 'Reservas', icon: '📅', roles: ['ADMIN', 'MANAGER', 'WAITER'] },
-  { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'MANAGER'] },
-  { view: 'history', label: 'Historial', icon: '📜', roles: ['ADMIN', 'MANAGER'] },
-  { view: 'inventory', label: 'Inventario', icon: '📦', roles: ['ADMIN', 'MANAGER'] },
-  { view: 'recipes', label: 'Recetas', icon: '🧑‍🍳', roles: ['ADMIN', 'MANAGER'] },
-  { view: 'modifiers', label: 'Extras', icon: '🧩', roles: ['ADMIN', 'MANAGER'] },
-  { view: 'menuadmin', label: 'Menú Admin', icon: '📝', roles: ['ADMIN', 'MANAGER'] },
-  { view: 'employees', label: 'Equipo', icon: '🔑', roles: ['ADMIN'] },
-  { view: 'settings', label: 'Config', icon: '⚙️', roles: ['ADMIN'] },
+  { view: 'floorplan', label: 'Mesas', icon: '🏗️', moduleId: 'floorPlan' },
+  { view: 'menu', label: 'Menú', icon: '📋', moduleId: 'pos' },
+  { view: 'orders', label: 'Órdenes', icon: '🧾', moduleId: 'pos' },
+  { view: 'kitchen', label: 'Cocina', icon: '👨‍🍳', roles: ['ADMIN', 'MANAGER', 'CHEF'], moduleId: 'kitchen' },
+  { view: 'bar', label: 'Barra', icon: '🍺', roles: ['ADMIN', 'MANAGER', 'BARTENDER'], moduleId: 'bar' },
+  { view: 'cash', label: 'Caja', icon: '💰', roles: ['ADMIN', 'MANAGER', 'CASHIER'], moduleId: 'cash' },
+  { view: 'customers', label: 'Clientes', icon: '👥', roles: ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'], moduleId: 'customers' },
+  { view: 'reservations', label: 'Reservas', icon: '📅', roles: ['ADMIN', 'MANAGER', 'WAITER'], moduleId: 'appointments' },
+  { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'MANAGER'], moduleId: 'reports' },
+  { view: 'history', label: 'Historial', icon: '📜', roles: ['ADMIN', 'MANAGER'], moduleId: 'reports' },
+  { view: 'inventory', label: 'Inventario', icon: '📦', roles: ['ADMIN', 'MANAGER'], moduleId: 'inventory' },
+  { view: 'recipes', label: 'Recetas', icon: '🧑‍🍳', roles: ['ADMIN', 'MANAGER'], moduleId: 'recipes' },
+  { view: 'modifiers', label: 'Extras', icon: '🧩', roles: ['ADMIN', 'MANAGER'], moduleId: 'modifiers' },
+  { view: 'menuadmin', label: 'Menú Admin', icon: '📝', roles: ['ADMIN', 'MANAGER'], moduleId: 'pos' },
+  { view: 'employees', label: 'Equipo', icon: '🔑', roles: ['ADMIN'], moduleId: 'users' },
+  { view: 'settings', label: 'Config', icon: '⚙️', roles: ['ADMIN'], moduleId: 'config' },
   { view: 'tips', label: 'Tips', icon: '💡' },
 ];
 
@@ -53,10 +61,53 @@ export default function POSLayout() {
   const user = useAuthStore((s) => s.user);
   const userRole = user?.role || '';
 
+  // Tenant-aware module filtering
+  const isModuleEnabled = useTenantStore((s) => s.isModuleEnabled);
+  const t = useTenantStore((s) => s.t);
+  const terminology = useTenantStore((s) => s.terminology);
+
+  // Apply terminology to labels dynamically
+  const getLabel = (item: NavItem): string => {
+    if (!terminology) return item.label;
+    // Map specific views to terminology keys
+    const labelMap: Partial<Record<View, keyof typeof terminology>> = {
+      floorplan: 'tables',
+      menu: 'menu',
+      orders: 'orders',
+      kitchen: 'kitchen',
+      customers: 'customers',
+      reservations: 'reservations',
+      inventory: 'inventory',
+    };
+    const termKey = labelMap[item.view];
+    if (termKey && terminology[termKey]) {
+      // Capitalize first letter
+      const term = terminology[termKey];
+      return term.charAt(0).toUpperCase() + term.slice(1);
+    }
+    return item.label;
+  };
+
+  // Filter by role AND by enabled modules
   const visibleItems = ALL_NAV_ITEMS.filter((item) => {
-    if (!item.roles) return true; // Visible para todos
-    return item.roles.includes(userRole);
-  });
+    // Role check
+    if (item.roles && !item.roles.includes(userRole)) return false;
+    // Module check
+    if (item.moduleId && !isModuleEnabled(item.moduleId)) return false;
+    return true;
+  }).map(item => ({
+    ...item,
+    label: getLabel(item),
+  }));
+
+  // If the active view's module got disabled, redirect to first available
+  useEffect(() => {
+    const activeItem = ALL_NAV_ITEMS.find(i => i.view === activeView);
+    if (activeItem?.moduleId && !isModuleEnabled(activeItem.moduleId)) {
+      const firstVisible = visibleItems[0];
+      if (firstVisible) setActiveView(firstVisible.view);
+    }
+  }, [activeView, isModuleEnabled]);
 
   const isAllowed = (requiredRoles: string[]) => requiredRoles.includes(userRole);
 

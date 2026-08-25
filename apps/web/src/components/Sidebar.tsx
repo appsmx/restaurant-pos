@@ -1,4 +1,5 @@
 import { useAuthStore } from '../stores/authStore';
+import { useTenantStore } from '../stores/tenantStore';
 import { View, NavItem } from './POSLayout';
 
 interface SidebarProps {
@@ -10,11 +11,18 @@ interface SidebarProps {
 export default function Sidebar({ activeView, onViewChange, navItems }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const tenant = useTenantStore((s) => s.tenant);
+
+  // Show first letter of business name or "L" for Logan
+  const logoLetter = tenant?.name?.[0]?.toUpperCase() || 'L';
 
   return (
     <aside className="w-20 bg-gray-900 flex flex-col items-center py-4 gap-2 h-full">
-      <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg mb-4">
-        P
+      <div
+        className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg mb-4"
+        title={tenant?.name || 'Logan POS'}
+      >
+        {logoLetter}
       </div>
 
       {navItems.map((item) => (
