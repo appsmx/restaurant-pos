@@ -164,8 +164,8 @@ export const useTenantStore = create<TenantState>((set, get) => ({
 
   t: (key: keyof Terminology) => {
     const { terminology } = get();
-    if (!terminology) return DEFAULT_TERMINOLOGY[key] || key;
-    return terminology[key] || DEFAULT_TERMINOLOGY[key] || key;
+    if (!terminology) return DEFAULT_TERMINOLOGY[key] || String(key);
+    return terminology[key] || DEFAULT_TERMINOLOGY[key] || String(key);
   },
 
   getBusinessName: () => {
