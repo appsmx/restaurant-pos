@@ -167,24 +167,55 @@ export const kitchenService = {
   },
 
   /**
-   * Marcar todos los items de una orden como READY de un golpe
+   * Marcar items de una orden como READY — filtrado por destino
+   * Si destination = 'BAR', solo marca bebidas. Si 'KITCHEN', solo comida.
    */
-  markOrderReady: async (orderId: string) => {
+  markOrderReady: async (orderId: string, destination?: string) => {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new AppError('Orden no encontrada', 404);
 
-    await prisma.orderItem.updateMany({
-      where: { orderId, status: { in: ['SENT', 'PREPARING'] } },
-      data: { status: 'READY' },
-    });
+    const BAR_CATEGORIES = ['bebidas'];
 
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'READY' },
-    });
+    if (destination) {
+      // Get items with their category to filter
+      const items = await prisma.orderItem.findMany({
+        where: { orderId, status: { in: ['SENT', 'PREPARING'] } },
+        include: { product: { include: { category: true } } },
+      });
 
-    // Log event
-    await logKitchenEvent(orderId, 'ORDER_READY', 'Toda la orden lista para servir');
+      const itemsToMark = items.filter((item) => {
+        const catName = item.product.category?.name?.toLowerCase() || '';
+        if (destination === 'BAR') return BAR_CATEGORIES.includes(catName);
+        if (destination === 'KITCHEN') return !BAR_CATEGORIES.includes(catName);
+        return true;
+      });
+
+      // Mark only filtered items as READY
+      if (itemsToMark.length > 0) {
+        await prisma.orderItem.updateMany({
+          where: { id: { in: itemsToMark.map((i) => i.id) } },
+          data: { status: 'READY' },
+        });
+      }
+
+      // Log event
+      const destLabel = destination === 'BAR' ? 'Barra' : 'Cocina';
+      await logKitchenEvent(orderId, 'ORDER_READY', `${destLabel}: ${itemsToMark.length} items listos`);
+    } else {
+      // No destination filter — mark ALL items (legacy/admin behavior)
+      await prisma.orderItem.updateMany({
+        where: { orderId, status: { in: ['SENT', 'PREPARING'] } },
+        data: { status: 'READY' },
+      });
+      await logKitchenEvent(orderId, 'ORDER_READY', 'Toda la orden lista para servir');
+    }
+
+    // Check if ALL items in the order are now READY → update order status
+    const allItems = await prisma.orderItem.findMany({ where: { orderId } });
+    const allReady = allItems.every((oi) => ['READY', 'DELIVERED'].includes(oi.status));
+    if (allReady) {
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'READY' } });
+    }
 
     return { success: true };
   },

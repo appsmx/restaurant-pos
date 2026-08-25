@@ -122,7 +122,7 @@ export default function Kitchen({ destination, title, icon }: { destination?: st
 
   const handleMarkOrderReady = async (orderId: string) => {
     try {
-      await apiClient(`/kitchen/order/${orderId}/ready`, 'PATCH');
+      await apiClient(`/kitchen/order/${orderId}/ready?destination=${dest}`, 'PATCH');
       fetchQueue();
       fetchCompleted();
     } catch {}

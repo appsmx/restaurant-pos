@@ -36,10 +36,11 @@ router.patch('/:itemId/ready', async (req, res, next) => {
   }
 });
 
-// PATCH /api/kitchen/order/:orderId/ready — toda la orden lista
+// PATCH /api/kitchen/order/:orderId/ready?destination=BAR|KITCHEN
 router.patch('/order/:orderId/ready', async (req, res, next) => {
   try {
-    const result = await kitchenService.markOrderReady(req.params.orderId);
+    const destination = req.query.destination as string | undefined;
+    const result = await kitchenService.markOrderReady(req.params.orderId, destination);
     res.json(result);
   } catch (error) {
     next(error);
