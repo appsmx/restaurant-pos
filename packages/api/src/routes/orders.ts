@@ -92,7 +92,13 @@ router.post('/:id/split-pay', validate(splitPaySchema), async (req: AuthRequest,
 // GET /api/orders/:id — order detail with timeline
 router.get('/:id', async (req, res, next) => {
   try {
-    const order = await orderService.getOrderDetail(req.params.id);
+    const { id } = req.params;
+    // Validate UUID format to avoid catching non-order routes
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ success: false, message: 'ID de orden inválido. Debe ser un UUID.' });
+    }
+    const order = await orderService.getOrderDetail(id);
     res.json(order);
   } catch (error) {
     next(error);
