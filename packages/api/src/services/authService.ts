@@ -15,11 +15,11 @@ export const authService = {
     if (!user.active) throw new AppError('Usuario inactivo', 403);
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new AppError('Credenciales inválidas', 401);
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ userId: user.id, tenantId: user.tenantId }, JWT_SECRET, { expiresIn: '8h' });
     await prisma.session.create({
-      data: { userId: user.id, token, expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) }
+      data: { tenantId: user.tenantId, userId: user.id, token, expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) }
     });
-    return { token, user: { id: user.id, username: user.username, name: user.name, role: user.role } };
+    return { token, user: { id: user.id, username: user.username, name: user.name, role: user.role }, tenantId: user.tenantId };
   },
 
   /**
@@ -30,7 +30,6 @@ export const authService = {
       throw new AppError('El PIN debe ser de 4 dígitos', 400);
     }
 
-    // Buscar usuario por PIN (el campo pin es único)
     const user = await prisma.user.findFirst({ where: { pin } });
     if (!user) throw new AppError('PIN incorrecto', 401);
     if (!user.active) throw new AppError('Usuario inactivo', 403);
@@ -40,13 +39,12 @@ export const authService = {
       const valid = await bcrypt.compare(pin, user.pinHash);
       if (!valid) throw new AppError('PIN incorrecto', 401);
     }
-    // Si no hay pinHash pero sí pin match (legacy), aceptar
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ userId: user.id, tenantId: user.tenantId }, JWT_SECRET, { expiresIn: '8h' });
     await prisma.session.create({
-      data: { userId: user.id, token, expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) }
+      data: { tenantId: user.tenantId, userId: user.id, token, expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000) }
     });
-    return { token, user: { id: user.id, username: user.username, name: user.name, role: user.role } };
+    return { token, user: { id: user.id, username: user.username, name: user.name, role: user.role }, tenantId: user.tenantId };
   },
 
   /**
