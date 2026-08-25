@@ -12,7 +12,9 @@ import customerRoutes from './customers';
 import configRoutes from './config';
 import modifierRoutes from './modifiers';
 import reservationRoutes from './reservations';
+import tenantRoutes from './tenant';
 import { menuService } from '../services/menuService';
+import { moduleGuard } from '../middleware/moduleGuard';
 
 const router = Router();
 
@@ -39,9 +41,21 @@ router.get('/public/config', async (req, res, next) => {
   }
 });
 
+// ==================== TENANT CONFIG (public — only needs tenant context) ====================
+
+router.use('/tenant', tenantRoutes);
+
 // ==================== PROTECTED ROUTES ====================
+// moduleGuard runs on all protected routes — checks if the tenant has
+// the required module enabled for the requested route prefix.
+// Core modules (pos, users, config, reports, cash) always pass.
 
 router.use('/auth', authRoutes);
+
+// Apply moduleGuard to all feature routes below.
+// It checks req.tenant.enabledModules against the route prefix.
+router.use(moduleGuard);
+
 router.use('/menu', menuRoutes);
 router.use('/floorplan', floorPlanRoutes);
 router.use('/orders', orderRoutes);
