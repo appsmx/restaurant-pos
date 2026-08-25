@@ -1,23 +1,122 @@
 import { PrismaClient } from '@prisma/client';
+import { getCurrentTenantId } from './tenantContext';
 
 /**
- * Prisma Client instance.
+ * Prisma Client with automatic multi-tenant tenantId injection.
  *
- * Exported as `any` to allow existing services to work without TypeScript errors
- * after the multi-tenant schema migration added `tenantId` as a required field.
+ * The extension auto-injects tenantId into:
+ *   - WHERE clauses (findMany, findFirst, updateMany, deleteMany, aggregate, count)
+ *   - DATA on creates (create, createMany)
+ *   - WHERE on updates/deletes (update, delete)
  *
- * The Prisma-generated types now require `tenantId` (or `tenant: { connect }`)
- * in every `create()` call and composite unique fields in `findUnique()`.
- * However, the multi-tenant middleware (Phase 2+) injects `tenantId` at runtime
- * transparently — services don't need to pass it manually.
- *
- * This `any` cast allows:
- *   - Existing create() calls to work without passing tenantId (injected at runtime)
- *   - findFirst() with non-unique fields like { username } (now tenant-scoped composite)
- *   - The build to pass in Vercel/CI without type errors
- *
- * TODO: Once the Prisma Client Extension is active on main (Phase 2 merge),
- * replace this with the extended client that has proper runtime tenant injection.
+ * If no tenant context is set (e.g., during seeds/admin scripts), queries run unfiltered.
+ * The Tenant model itself is excluded from filtering.
  */
+
 const basePrisma = new PrismaClient();
-export const prisma: any = basePrisma;
+
+const EXCLUDED_MODELS = new Set(['Tenant']);
+const TENANT_MODELS = new Set([
+  'User', 'Session', 'Category', 'Product', 'ModifierGroup', 'ModifierItem',
+  'Section', 'Table', 'Order', 'OrderItem', 'OrderItemModifier', 'Payment',
+  'Ingredient', 'RecipeIngredient', 'StockMovement', 'SyncQueue',
+  'CashRegister', 'CashMovement', 'Customer', 'OrderEvent', 'RestaurantConfig',
+  'Reservation',
+]);
+
+function shouldFilter(model: string | undefined): boolean {
+  if (!model) return false;
+  if (EXCLUDED_MODELS.has(model)) return false;
+  return TENANT_MODELS.has(model);
+}
+
+const extendedPrisma = basePrisma.$extends({
+  query: {
+    $allModels: {
+      async findMany({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) args.where = { ...args.where, tenantId };
+        }
+        return query(args);
+      },
+      async findFirst({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) args.where = { ...args.where, tenantId };
+        }
+        return query(args);
+      },
+      async findUnique({ model, args, query }) {
+        return query(args);
+      },
+      async findUniqueOrThrow({ model, args, query }) {
+        return query(args);
+      },
+      async create({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) (args.data as any).tenantId = tenantId;
+        }
+        return query(args);
+      },
+      async createMany({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) {
+            if (Array.isArray(args.data)) {
+              args.data = args.data.map((item: any) => ({ ...item, tenantId }));
+            } else {
+              (args.data as any).tenantId = tenantId;
+            }
+          }
+        }
+        return query(args);
+      },
+      async update({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) (args.where as any).tenantId = tenantId;
+        }
+        return query(args);
+      },
+      async updateMany({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) args.where = { ...args.where, tenantId };
+        }
+        return query(args);
+      },
+      async delete({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) (args.where as any).tenantId = tenantId;
+        }
+        return query(args);
+      },
+      async deleteMany({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) args.where = { ...args.where, tenantId };
+        }
+        return query(args);
+      },
+      async aggregate({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) args.where = { ...args.where, tenantId };
+        }
+        return query(args);
+      },
+      async count({ model, args, query }) {
+        if (shouldFilter(model)) {
+          const tenantId = getCurrentTenantId();
+          if (tenantId) args.where = { ...args.where, tenantId };
+        }
+        return query(args);
+      },
+    },
+  },
+});
+
+export const prisma: any = extendedPrisma;
