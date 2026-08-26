@@ -51,6 +51,7 @@ router.post('/ask', aiLimiter, async (req: AuthRequest, res: Response, next: Nex
     const result = await aiService.ask({
       tenantId,
       message: (message || '').trim(),
+      userRole: req.userRole,
       history: Array.isArray(history) ? history.slice(-10) : [], // Max 10 turns of history
       confirmAction: isConfirming ? confirmAction : undefined,
     });
