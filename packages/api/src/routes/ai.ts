@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { auth, AuthRequest } from '../middleware/auth';
 import { aiService } from '../services/aiService';
+import { aiLimiter } from '../middleware/rateLimit';
 
 /**
  * AI Assistant Routes
@@ -27,7 +28,7 @@ router.use(auth);
  *   provider: string — which LLM answered (gemini/openai/zai)
  * }
  */
-router.post('/ask', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/ask', aiLimiter, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { message, history, confirmAction } = req.body;
 

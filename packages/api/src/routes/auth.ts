@@ -4,6 +4,7 @@ import { auth, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { loginSchema } from '../lib/validators';
 import { prisma } from '../lib/prisma';
+import { authLimiter } from '../middleware/rateLimit';
 import { z } from 'zod';
 
 const router = Router();
@@ -22,7 +23,7 @@ const loginWithSlugSchema = z.object({
 });
 
 // POST /api/auth/login — login tradicional (username + password + optional slug)
-router.post('/login', validate(loginWithSlugSchema), async (req, res, next) => {
+router.post('/login', authLimiter, validate(loginWithSlugSchema), async (req, res, next) => {
   try {
     const { username, password, slug } = req.body;
     const result = await authService.login(username, password, slug);
@@ -33,7 +34,7 @@ router.post('/login', validate(loginWithSlugSchema), async (req, res, next) => {
 });
 
 // POST /api/auth/pin — login rápido con PIN (+ optional slug)
-router.post('/pin', validate(pinLoginSchema), async (req, res, next) => {
+router.post('/pin', authLimiter, validate(pinLoginSchema), async (req, res, next) => {
   try {
     const { pin, slug } = req.body;
     const result = await authService.loginWithPin(pin, slug);
