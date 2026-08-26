@@ -18,10 +18,11 @@ import CashRegister from '../pages/CashRegister';
 import Customers from '../pages/Customers';
 import Settings from '../pages/Settings';
 import Reservations from '../pages/Reservations';
+import Import from '../pages/Import';
 import { useAuthStore } from '../stores/authStore';
 import { useTenantStore } from '../stores/tenantStore';
 
-export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'modifiers' | 'menuadmin' | 'employees' | 'kitchen' | 'bar' | 'cash' | 'customers' | 'settings' | 'reservations';
+export type View = 'floorplan' | 'menu' | 'orders' | 'tips' | 'dashboard' | 'history' | 'inventory' | 'recipes' | 'modifiers' | 'menuadmin' | 'employees' | 'kitchen' | 'bar' | 'cash' | 'customers' | 'settings' | 'reservations' | 'import';
 
 export interface NavItem {
   view: View;
@@ -53,6 +54,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { view: 'modifiers', label: 'Extras', icon: '🧩', roles: ['ADMIN', 'MANAGER'], moduleId: 'modifiers' },
   { view: 'menuadmin', label: 'Menú Admin', icon: '📝', roles: ['ADMIN', 'MANAGER'], moduleId: 'pos' },
   { view: 'employees', label: 'Equipo', icon: '🔑', roles: ['ADMIN'], moduleId: 'users' },
+  { view: 'import', label: 'Importar', icon: '🔄', roles: ['ADMIN'] },
   { view: 'settings', label: 'Config', icon: '⚙️', roles: ['ADMIN'], moduleId: 'config' },
   { view: 'tips', label: 'Tips', icon: '💡' },
 ];
@@ -131,6 +133,7 @@ export default function POSLayout() {
       case 'menuadmin': return isAllowed(['ADMIN', 'MANAGER']) ? <MenuAdmin /> : <FloorPlan onViewChange={setActiveView} />;
       case 'employees': return isAllowed(['ADMIN']) ? <Employees /> : <FloorPlan onViewChange={setActiveView} />;
       case 'settings': return isAllowed(['ADMIN']) ? <Settings /> : <FloorPlan onViewChange={setActiveView} />;
+      case 'import': return isAllowed(['ADMIN']) ? <Import /> : <FloorPlan onViewChange={setActiveView} />;
     }
   };
 
