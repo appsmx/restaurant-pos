@@ -58,9 +58,14 @@ export default function PublicMenu() {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
+        // Get tenant slug from URL (e.g., /menu?t=quiroa or /menu?slug=quiroa)
+        const urlParams = new URLSearchParams(window.location.search);
+        const slug = urlParams.get('t') || urlParams.get('slug') || '';
+        const slugParam = slug ? `?slug=${slug}` : '';
+
         const [menuRes, configRes] = await Promise.all([
-          fetch(`${API_URL}/public/menu`),
-          fetch(`${API_URL}/public/config`),
+          fetch(`${API_URL}/public/menu${slugParam}`),
+          fetch(`${API_URL}/public/config${slugParam}`),
         ]);
         const menuData = await menuRes.json();
         const configData = await configRes.json();
