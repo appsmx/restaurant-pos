@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { auth, AuthRequest } from '../middleware/auth';
-import { getDefaultModules } from '../lib/modules';
+import { getDefaultModules, MODULE_REGISTRY } from '../lib/modules';
+import { runWithTenant } from '../lib/tenantContext';
 import bcrypt from 'bcrypt';
 
 /**
@@ -403,6 +404,83 @@ router.get('/onboarding/check-slug/:slug', async (req: Request, res: Response, n
       slug,
       suggestedUrl: `https://${slug}.logancorp.mx`,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== MODULES REGISTRY ====================
+
+/**
+ * GET /api/admin/modules — List all available modules (for the module manager UI)
+ */
+router.get('/modules', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const modules = MODULE_REGISTRY.map((m) => ({
+      id: m.id,
+      label: m.label,
+      description: m.description,
+      core: m.core,
+      icon: m.icon,
+      minimumPlan: m.minimumPlan,
+      availableFor: m.availableFor,
+    }));
+    res.json({ modules });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== PER-TENANT METRICS ====================
+
+/**
+ * GET /api/admin/tenants/:id/metrics — Real sales metrics for a specific tenant
+ * Uses runWithTenant to scope all queries to this tenant's data.
+ */
+router.get('/tenants/:id/metrics', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
+
+    // Scope all queries to this tenant
+    const metrics = await runWithTenant(id, async () => {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [todayOrders, monthOrders, totalClosedOrders, activeUsers, lastOrder] = await Promise.all([
+        prisma.order.findMany({
+          where: { status: 'CLOSED', closedAt: { gte: todayStart } },
+          select: { total: true },
+        }),
+        prisma.order.findMany({
+          where: { status: 'CLOSED', closedAt: { gte: monthStart } },
+          select: { total: true },
+        }),
+        prisma.order.count({ where: { status: 'CLOSED' } }),
+        prisma.user.count({ where: { active: true } }),
+        prisma.order.findFirst({
+          where: { status: 'CLOSED' },
+          orderBy: { closedAt: 'desc' },
+          select: { closedAt: true },
+        }),
+      ]);
+
+      const todaySales = todayOrders.reduce((s: number, o: any) => s + o.total, 0);
+      const monthSales = monthOrders.reduce((s: number, o: any) => s + o.total, 0);
+
+      return {
+        today: { sales: Math.round(todaySales * 100) / 100, orders: todayOrders.length },
+        month: { sales: Math.round(monthSales * 100) / 100, orders: monthOrders.length },
+        totalClosedOrders,
+        activeUsers,
+        lastActivity: lastOrder?.closedAt || null,
+      };
+    });
+
+    res.json(metrics);
   } catch (error) {
     next(error);
   }

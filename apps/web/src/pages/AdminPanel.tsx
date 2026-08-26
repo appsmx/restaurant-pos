@@ -132,12 +132,17 @@ function DashboardTab() {
 function TenantsTab() {
   const [tenants, setTenants] = useState<TenantItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchTenants = () => {
     apiClient('/admin/tenants')
       .then((data) => setTenants(data.tenants || []))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchTenants();
   }, []);
 
   const toggleActive = async (id: string, currentActive: boolean) => {
@@ -160,7 +165,11 @@ function TenantsTab() {
       ) : (
         <div className="space-y-3">
           {tenants.map((t) => (
-            <div key={t.id} className="bg-gray-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div
+              key={t.id}
+              onClick={() => setSelectedId(t.id)}
+              className="bg-gray-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer hover:bg-gray-700/60 transition-colors"
+            >
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold ${t.active ? 'bg-blue-600' : 'bg-gray-700'}`}>
                   {t.name[0]?.toUpperCase()}
@@ -174,6 +183,11 @@ function TenantsTab() {
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
                       {t.plan}
                     </span>
+                    {!t.setupPaid && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
+                        Setup pendiente
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {t.slug}.logancorp.mx · {t.businessType.toLowerCase()} · ${t.monthlyRate}/mes
@@ -186,7 +200,7 @@ function TenantsTab() {
                 <span>🧾 {t._count.orders}</span>
                 <span>📋 {t._count.products}</span>
                 <button
-                  onClick={() => toggleActive(t.id, t.active)}
+                  onClick={(e) => { e.stopPropagation(); toggleActive(t.id, t.active); }}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                     t.active
                       ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
@@ -195,11 +209,271 @@ function TenantsTab() {
                 >
                   {t.active ? 'Desactivar' : 'Reactivar'}
                 </button>
+                <span className="text-gray-600">→</span>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {selectedId && (
+        <TenantDetailModal
+          tenantId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onUpdated={fetchTenants}
+        />
+      )}
+    </div>
+  );
+}
+
+// ==================== TENANT DETAIL MODAL ====================
+
+interface ModuleDef {
+  id: string;
+  label: string;
+  description: string;
+  core: boolean;
+  icon: string;
+  minimumPlan: string | null;
+}
+
+interface TenantMetrics {
+  today: { sales: number; orders: number };
+  month: { sales: number; orders: number };
+  totalClosedOrders: number;
+  activeUsers: number;
+  lastActivity: string | null;
+}
+
+function TenantDetailModal({ tenantId, onClose, onUpdated }: { tenantId: string; onClose: () => void; onUpdated: () => void }) {
+  const [tenant, setTenant] = useState<any>(null);
+  const [modules, setModules] = useState<ModuleDef[]>([]);
+  const [metrics, setMetrics] = useState<TenantMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    try {
+      const [tenantData, modulesData, metricsData] = await Promise.all([
+        apiClient(`/admin/tenants/${tenantId}`),
+        apiClient('/admin/modules'),
+        apiClient(`/admin/tenants/${tenantId}/metrics`).catch(() => null),
+      ]);
+      setTenant(tenantData);
+      setModules(modulesData.modules || []);
+      setMetrics(metricsData);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [tenantId]);
+
+  const toggleModule = async (moduleId: string, currentlyEnabled: boolean) => {
+    setSaving(true);
+    try {
+      const data = await apiClient(`/admin/tenants/${tenantId}/toggle-module`, 'POST', {
+        moduleId,
+        enabled: !currentlyEnabled,
+      });
+      setTenant((prev: any) => ({ ...prev, enabledModules: data.enabledModules }));
+      onUpdated();
+    } catch {
+      alert('Error al cambiar módulo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateBilling = async (patch: Record<string, any>) => {
+    setSaving(true);
+    try {
+      const data = await apiClient(`/admin/tenants/${tenantId}`, 'PATCH', patch);
+      setTenant((prev: any) => ({ ...prev, ...data.tenant }));
+      onUpdated();
+    } catch {
+      alert('Error al actualizar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="relative bg-gray-900 rounded-2xl w-full max-w-2xl border border-gray-700 max-h-[90vh] flex flex-col">
+        {loading || !tenant ? (
+          <div className="p-12"><LoadingSpinner /></div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg font-bold ${tenant.active ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                  {tenant.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="text-white font-bold text-lg">{tenant.name}</h2>
+                  <p className="text-gray-500 text-xs">{tenant.slug}.logancorp.mx · {tenant.businessType?.toLowerCase()}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="text-gray-400 hover:text-white text-xl p-1">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-5 space-y-6">
+              {/* Metrics */}
+              {metrics && (
+                <div>
+                  <h3 className="text-white font-semibold text-sm mb-3">📊 Métricas reales</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div className="bg-gray-800 rounded-xl p-3 text-center">
+                      <p className="text-emerald-400 font-bold text-lg">${metrics.today.sales.toLocaleString()}</p>
+                      <p className="text-gray-500 text-[10px]">Hoy ({metrics.today.orders} órd.)</p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-3 text-center">
+                      <p className="text-blue-400 font-bold text-lg">${metrics.month.sales.toLocaleString()}</p>
+                      <p className="text-gray-500 text-[10px]">Este mes ({metrics.month.orders} órd.)</p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-3 text-center">
+                      <p className="text-white font-bold text-lg">{metrics.totalClosedOrders}</p>
+                      <p className="text-gray-500 text-[10px]">Órdenes totales</p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-3 text-center">
+                      <p className="text-white font-bold text-lg">{metrics.activeUsers}</p>
+                      <p className="text-gray-500 text-[10px]">Usuarios activos</p>
+                    </div>
+                  </div>
+                  {metrics.lastActivity && (
+                    <p className="text-gray-600 text-xs mt-2">
+                      Última venta: {new Date(metrics.lastActivity).toLocaleString('es-MX')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Billing */}
+              <div>
+                <h3 className="text-white font-semibold text-sm mb-3">💰 Facturación</h3>
+                <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-sm">Plan</span>
+                    <select
+                      value={tenant.plan}
+                      onChange={(e) => updateBilling({ plan: e.target.value })}
+                      disabled={saving}
+                      className="bg-gray-700 text-white text-sm rounded-lg border border-gray-600 px-3 py-1.5"
+                    >
+                      <option value="STARTER">Starter — $500/mes</option>
+                      <option value="GROWTH">Growth — $1,000/mes</option>
+                      <option value="PRO">Pro — $1,500/mes</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-sm">Tarifa mensual (MXN)</span>
+                    <input
+                      type="number"
+                      defaultValue={tenant.monthlyRate}
+                      onBlur={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v) && v !== tenant.monthlyRate) updateBilling({ monthlyRate: v });
+                      }}
+                      className="bg-gray-700 text-white text-sm rounded-lg border border-gray-600 px-3 py-1.5 w-28 text-right"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-sm">Setup pagado</span>
+                    <button
+                      onClick={() => updateBilling({ setupPaid: !tenant.setupPaid })}
+                      disabled={saving}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        tenant.setupPaid
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                      }`}
+                    >
+                      {tenant.setupPaid ? '✓ Pagado' : 'Marcar como pagado'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modules */}
+              <div>
+                <h3 className="text-white font-semibold text-sm mb-3">🧩 Módulos</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {modules.map((m) => {
+                    const enabled = tenant.enabledModules?.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => !m.core && toggleModule(m.id, enabled)}
+                        disabled={m.core || saving}
+                        className={`text-left p-3 rounded-xl border transition-colors ${
+                          m.core
+                            ? 'border-gray-700 bg-gray-800/50 cursor-default'
+                            : enabled
+                            ? 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15'
+                            : 'border-gray-700 bg-gray-800 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-sm font-medium ${enabled || m.core ? 'text-white' : 'text-gray-400'}`}>
+                            {m.label}
+                          </span>
+                          {m.core ? (
+                            <span className="text-[10px] text-gray-500">core</span>
+                          ) : (
+                            <span className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-colors ${enabled ? 'bg-emerald-500 justify-end' : 'bg-gray-600 justify-start'}`}>
+                              <span className="w-4 h-4 rounded-full bg-white" />
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-500 text-[11px] mt-1">{m.description}</p>
+                        {m.minimumPlan && (
+                          <span className="text-[10px] text-purple-400 mt-1 inline-block">Requiere {m.minimumPlan}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Users */}
+              {tenant.users && tenant.users.length > 0 && (
+                <div>
+                  <h3 className="text-white font-semibold text-sm mb-3">👥 Usuarios ({tenant.users.length})</h3>
+                  <div className="space-y-1.5">
+                    {tenant.users.map((u: any) => (
+                      <div key={u.id} className="bg-gray-800 rounded-lg px-3 py-2 flex items-center justify-between">
+                        <div>
+                          <span className="text-white text-sm">{u.name}</span>
+                          <span className="text-gray-500 text-xs ml-2">@{u.username}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-300">{u.role}</span>
+                          {!u.active && <span className="text-[10px] text-red-400">inactivo</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-800">
+              <button onClick={onClose} className="w-full py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
