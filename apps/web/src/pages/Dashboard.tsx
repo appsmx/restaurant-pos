@@ -37,6 +37,19 @@ interface ProductSales {
   revenue: number;
 }
 
+interface Comparison {
+  period: string;
+  current: { totalSales: number; totalOrders: number; avgTicket: number; totalTips: number };
+  previous: { totalSales: number; totalOrders: number; avgTicket: number; totalTips: number };
+  change: { totalSales: number; totalOrders: number; avgTicket: number; totalTips: number };
+}
+
+interface EmployeeOfMonth {
+  month: string;
+  winner: { id: string; name: string; role: string; orders: number; total: number; tips: number; avgTicket: number } | null;
+  ranking: { id: string; name: string; role: string; orders: number; total: number; tips: number; avgTicket: number }[];
+}
+
 type Period = 'today' | 'week' | 'month';
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -61,9 +74,34 @@ export default function Dashboard() {
   const [products, setProducts] = useState<ProductSales[]>([]);
   const [dailyData, setDailyData] = useState<{ date: string; sales: number; orders: number; rawDate: string }[]>([]);
   const [stockAlerts, setStockAlerts] = useState<{ id: string; name: string; stock: number; unit: string; severity: string }[]>([]);
+  const [comparison, setComparison] = useState<Comparison | null>(null);
+  const [employeeOfMonth, setEmployeeOfMonth] = useState<EmployeeOfMonth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [drilldown, setDrilldown] = useState<DrilldownFilters | null>(null);
+
+  const downloadExcel = () => {
+    const token = localStorage.getItem('pos_token');
+    const tenantSlug = localStorage.getItem('pos_tenant_slug');
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    // Open in new tab with auth via query (or fetch blob). Use fetch for header auth.
+    fetch(`${API_URL}/reports/export-excel?period=${period}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
+      },
+    })
+      .then((r) => r.blob())
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte_logan_${period}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(() => alert('Error al exportar el reporte'));
+  };
 
   const fetchData = async () => {
     try {
@@ -87,6 +125,16 @@ export default function Dashboard() {
         const alerts = await apiClient('/inventory/alerts', 'GET');
         setStockAlerts(alerts);
       } catch { /* alerts optional */ }
+      // Fetch period comparison (skip for 'today' — comparing single days is less useful but still works)
+      try {
+        const comp = await apiClient(`/reports/comparison?period=${period}`, 'GET');
+        setComparison(comp);
+      } catch { /* comparison optional */ }
+      // Fetch employee of the month (only relevant for month view, but always fetch)
+      try {
+        const eom = await apiClient('/reports/employee-of-month', 'GET');
+        setEmployeeOfMonth(eom);
+      } catch { /* eom optional */ }
     } catch (err) {
       setError('Error al cargar los reportes. Verifica que tengas permisos de administrador.');
     } finally {
@@ -107,7 +155,7 @@ export default function Dashboard() {
       {/* Header + Period selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <h1 className="text-xl md:text-2xl font-bold">📊 Dashboard</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
             <button
               key={p}
@@ -121,8 +169,56 @@ export default function Dashboard() {
               {PERIOD_LABELS[p]}
             </button>
           ))}
+          <button
+            onClick={downloadExcel}
+            className="px-3 py-1.5 rounded-full text-xs md:text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1.5"
+            title="Descargar reporte en Excel"
+          >
+            📥 Excel
+          </button>
         </div>
       </div>
+
+      {/* Period Comparison */}
+      {comparison && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-gray-400">
+              {period === 'today' ? 'Hoy vs ayer' : period === 'week' ? 'Esta semana vs anterior' : 'Este mes vs anterior'}
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <ComparisonCard label="Ventas" current={`$${comparison.current.totalSales.toLocaleString('es-MX')}`} change={comparison.change.totalSales} />
+            <ComparisonCard label="Órdenes" current={comparison.current.totalOrders.toString()} change={comparison.change.totalOrders} />
+            <ComparisonCard label="Ticket prom." current={`$${comparison.current.avgTicket.toLocaleString('es-MX')}`} change={comparison.change.avgTicket} />
+            <ComparisonCard label="Propinas" current={`$${comparison.current.totalTips.toLocaleString('es-MX')}`} change={comparison.change.totalTips} />
+          </div>
+        </div>
+      )}
+
+      {/* Employee of the Month */}
+      {employeeOfMonth?.winner && (
+        <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="text-4xl">🏆</div>
+            <div className="flex-1">
+              <p className="text-amber-400 text-xs font-medium uppercase tracking-wide">Empleado del mes · {employeeOfMonth.month}</p>
+              <p className="text-lg font-bold mt-0.5">{employeeOfMonth.winner.name}</p>
+              <p className="text-sm text-gray-400">
+                {employeeOfMonth.winner.orders} órdenes · ${employeeOfMonth.winner.total.toLocaleString('es-MX')} vendido
+                {employeeOfMonth.winner.tips > 0 && ` · $${employeeOfMonth.winner.tips.toLocaleString('es-MX')} en propinas`}
+              </p>
+            </div>
+            {employeeOfMonth.ranking.length > 1 && (
+              <div className="hidden md:block text-right text-xs text-gray-500">
+                <p className="mb-1">Siguiente:</p>
+                <p className="text-gray-400">{employeeOfMonth.ranking[1].name}</p>
+                <p>${employeeOfMonth.ranking[1].total.toLocaleString('es-MX')}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Stock Alerts */}
       {stockAlerts.length > 0 && (
@@ -439,6 +535,22 @@ const COLOR_MAP = {
   purple: 'border-purple-500/30 bg-purple-500/5',
   amber: 'border-amber-500/30 bg-amber-500/5',
 };
+
+function ComparisonCard({ label, current, change }: { label: string; current: string; change: number }) {
+  const isUp = change > 0;
+  const isFlat = change === 0;
+  const color = isFlat ? 'text-gray-500' : isUp ? 'text-green-400' : 'text-red-400';
+  const arrow = isFlat ? '→' : isUp ? '↑' : '↓';
+  return (
+    <div className="bg-gray-800/50 rounded-lg p-3">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className="text-base md:text-lg font-bold">{current}</p>
+      <p className={`text-xs font-medium ${color} mt-0.5`}>
+        {arrow} {Math.abs(change)}% <span className="text-gray-600">vs anterior</span>
+      </p>
+    </div>
+  );
+}
 
 function KPICard({ icon, label, value, subtitle, color }: KPICardProps) {
   return (

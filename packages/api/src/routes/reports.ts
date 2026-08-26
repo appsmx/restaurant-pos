@@ -206,4 +206,102 @@ router.get('/order/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
+// GET /api/reports/comparison?period=week&from=&to= — periodo actual vs anterior
+router.get('/comparison', async (req: AuthRequest, res, next) => {
+  try {
+    const { period, from, to } = req.query;
+    const data = await reportService.getComparison(
+      (period as string) || 'week',
+      from as string | undefined,
+      to as string | undefined
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/reports/employee-of-month?monthOffset=0 — empleado del mes
+router.get('/employee-of-month', async (req: AuthRequest, res, next) => {
+  try {
+    const monthOffset = parseInt((req.query.monthOffset as string) || '0', 10);
+    const data = await reportService.getEmployeeOfMonth(monthOffset);
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/reports/export-excel?period=&from=&to= — exporta reporte real en .xlsx
+router.get('/export-excel', async (req: AuthRequest, res, next) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { period, from, to } = req.query;
+    const p = (period as string) || 'month';
+
+    // Gather all report data in parallel
+    const [summary, byEmployee, byProduct] = await Promise.all([
+      reportService.getSummary(p, from as string, to as string),
+      reportService.getByEmployee(p, from as string, to as string),
+      reportService.getByProduct(p, from as string, to as string),
+    ]);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Logan POS';
+    workbook.created = new Date();
+
+    // ── Sheet 1: Resumen ──
+    const resumen = workbook.addWorksheet('Resumen');
+    resumen.columns = [
+      { header: 'Métrica', key: 'metric', width: 30 },
+      { header: 'Valor', key: 'value', width: 20 },
+    ];
+    resumen.getRow(1).font = { bold: true };
+    resumen.addRow({ metric: 'Periodo', value: p });
+    resumen.addRow({ metric: 'Desde', value: new Date(summary.from).toLocaleDateString('es-MX') });
+    resumen.addRow({ metric: 'Hasta', value: new Date(summary.to).toLocaleDateString('es-MX') });
+    resumen.addRow({ metric: 'Ventas totales', value: summary.totalSales });
+    resumen.addRow({ metric: 'Propinas totales', value: summary.totalTips });
+    resumen.addRow({ metric: 'Órdenes totales', value: summary.totalOrders });
+    resumen.addRow({ metric: 'Ticket promedio', value: summary.avgTicket });
+    resumen.addRow({ metric: 'Producto estrella', value: summary.topProduct?.name || 'N/A' });
+
+    // ── Sheet 2: Por Empleado ──
+    const empleados = workbook.addWorksheet('Empleados');
+    empleados.columns = [
+      { header: 'Nombre', key: 'name', width: 25 },
+      { header: 'Rol', key: 'role', width: 15 },
+      { header: 'Órdenes', key: 'orders', width: 12 },
+      { header: 'Total vendido', key: 'total', width: 15 },
+      { header: 'Ticket promedio', key: 'avgTicket', width: 15 },
+    ];
+    empleados.getRow(1).font = { bold: true };
+    for (const emp of (byEmployee.creators || [])) {
+      empleados.addRow(emp);
+    }
+
+    // ── Sheet 3: Por Producto ──
+    const productos = workbook.addWorksheet('Productos');
+    productos.columns = [
+      { header: 'Producto', key: 'name', width: 30 },
+      { header: 'Categoría', key: 'category', width: 20 },
+      { header: 'Cantidad vendida', key: 'quantity', width: 18 },
+      { header: 'Ingresos', key: 'revenue', width: 15 },
+    ];
+    productos.getRow(1).font = { bold: true };
+    for (const prod of byProduct) {
+      productos.addRow(prod);
+    }
+
+    // Send the file
+    const fileName = `reporte_logan_${p}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
