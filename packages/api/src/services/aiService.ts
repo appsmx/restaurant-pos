@@ -25,8 +25,20 @@ interface AskResult {
 
 // ─── LLM Call ────────────────────────────────────────────────────────────────
 
+const LOGAN_LLM_URL = process.env.LOGAN_LLM_URL || 'https://logancorp.vercel.app/api/llm';
+const LOGAN_LLM_SECRET = process.env.LOGAN_LLM_SECRET || '';
+
 async function callLLM(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[]): Promise<{ text: string; provider: string }> {
-  // Try Gemini first (free), then OpenAI, then Z.ai
+  // Strategy 1: Use Logan LLM Proxy (centralized, no local keys needed)
+  if (LOGAN_LLM_URL) {
+    try {
+      return await callLoganProxy(systemPrompt, userMessage, history);
+    } catch (e) {
+      console.warn('[ai] Logan proxy failed:', (e as Error).message, '— trying direct providers...');
+    }
+  }
+
+  // Strategy 2: Direct provider calls (fallback if proxy is down or unconfigured)
   const providers = [
     { name: 'gemini', key: process.env.GEMINI_API_KEY },
     { name: 'openai', key: process.env.OPENAI_API_KEY },
@@ -50,7 +62,41 @@ async function callLLM(systemPrompt: string, userMessage: string, history?: { ro
     }
   }
 
-  throw new Error('No hay proveedor de IA disponible. Configura GEMINI_API_KEY, OPENAI_API_KEY, o ZAI_API_KEY.');
+  throw new Error('No hay proveedor de IA disponible. Configura LOGAN_LLM_URL o GEMINI_API_KEY/OPENAI_API_KEY/ZAI_API_KEY.');
+}
+
+/**
+ * Call the Logan LLM Proxy (centralized multi-provider endpoint)
+ * This is the preferred method — no API keys needed on this service.
+ */
+async function callLoganProxy(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[]): Promise<{ text: string; provider: string }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (LOGAN_LLM_SECRET) {
+    headers['Authorization'] = `Bearer ${LOGAN_LLM_SECRET}`;
+  }
+
+  const res = await fetch(LOGAN_LLM_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      task: 'assistant',
+      systemPrompt,
+      userMessage,
+      history: history || [],
+      maxTokens: 2048,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Logan LLM Proxy ${res.status}: ${err.error || res.statusText}`);
+  }
+
+  const data = await res.json();
+  if (!data.text) throw new Error('Logan proxy returned empty response');
+
+  return { text: data.text, provider: `logan-proxy (${data.provider}/${data.model})` };
 }
 
 async function callGemini(apiKey: string, systemPrompt: string, userMessage: string, history?: { role: string; content: string }[]): Promise<{ text: string; provider: string }> {
