@@ -14,6 +14,7 @@ import modifierRoutes from './modifiers';
 import reservationRoutes from './reservations';
 import tenantRoutes from './tenant';
 import adminRoutes from './admin';
+import importRoutes from './import';
 import { menuService } from '../services/menuService';
 import { moduleGuard } from '../middleware/moduleGuard';
 
@@ -72,5 +73,8 @@ router.use('/reservations', reservationRoutes);
 
 // ==================== ADMIN PANEL (auth + ADMIN role enforced internally) ====================
 router.use('/admin', adminRoutes);
+
+// ==================== IMPORT (auth + ADMIN) ====================
+router.use('/import', importRoutes);
 
 export default router;
