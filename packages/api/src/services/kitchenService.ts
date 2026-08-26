@@ -171,9 +171,15 @@ export const kitchenService = {
       // WebSocket: notify entire order is ready
       const order = await prisma.order.findUnique({
         where: { id: item.orderId },
-        select: { ticketNumber: true, table: { select: { name: true } } },
+        select: { ticketNumber: true, userId: true, table: { select: { name: true } }, user: { select: { name: true } } },
       });
-      emitOrderReady({ orderId: item.orderId, ticketNumber: order?.ticketNumber || 0, tableName: order?.table?.name || undefined });
+      emitOrderReady({
+        orderId: item.orderId,
+        ticketNumber: order?.ticketNumber || 0,
+        tableName: order?.table?.name || undefined,
+        userId: order?.userId || undefined,
+        waiterName: order?.user?.name || undefined,
+      });
     }
 
     return updated;
@@ -229,7 +235,17 @@ export const kitchenService = {
     if (allReady) {
       await prisma.order.update({ where: { id: orderId }, data: { status: 'READY' } });
       // WebSocket: notify entire order is ready
-      emitOrderReady({ orderId, ticketNumber: order.ticketNumber, tableName: undefined });
+      const orderInfo = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { userId: true, table: { select: { name: true } }, user: { select: { name: true } } },
+      });
+      emitOrderReady({
+        orderId,
+        ticketNumber: order.ticketNumber,
+        tableName: orderInfo?.table?.name || undefined,
+        userId: orderInfo?.userId || undefined,
+        waiterName: orderInfo?.user?.name || undefined,
+      });
     }
 
     // WebSocket: notify item changes regardless

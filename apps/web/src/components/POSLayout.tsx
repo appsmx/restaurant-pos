@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
+import NotificationProvider from './NotificationProvider';
 import FloorPlan from '../pages/FloorPlan';
 import MenuBrowser from '../pages/MenuBrowser';
 import OrderPanel from '../pages/OrderPanel';
@@ -135,6 +136,9 @@ export default function POSLayout() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gray-950 text-white">
+      {/* Notification toasts (order ready alerts) */}
+      <NotificationProvider />
+
       {/* Sidebar — visible solo en desktop */}
       <div className="hidden md:block">
         <Sidebar activeView={activeView} onViewChange={setActiveView} navItems={visibleItems} />

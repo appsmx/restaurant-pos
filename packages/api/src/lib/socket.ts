@@ -68,7 +68,7 @@ export function emitItemStatusChanged(data: { orderId: string; itemId: string; s
 /**
  * Emit when all items of an order are ready
  */
-export function emitOrderReady(data: { orderId: string; ticketNumber: number; tableName?: string }) {
+export function emitOrderReady(data: { orderId: string; ticketNumber: number; tableName?: string; userId?: string; waiterName?: string }) {
   if (!io) return;
   io.emit('order:ready', data);
 }
