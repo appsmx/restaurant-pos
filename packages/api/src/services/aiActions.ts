@@ -58,6 +58,34 @@ const READ_ACTIONS = new Set(['sales_by_date', 'top_products', 'low_stock', 'sea
 const WRITE_ACTIONS = new Set(['create_product', 'adjust_stock']);
 
 /**
+ * Which roles may execute each action.
+ * Sales/financial queries are restricted to ADMIN/MANAGER (like the reports module).
+ * Operational lookups (products, customers, stock) are open to more roles.
+ * Write actions are ADMIN/MANAGER only.
+ */
+const ACTION_ROLES: Record<string, string[]> = {
+  // Read — financial (restricted)
+  sales_by_date: ['ADMIN', 'MANAGER'],
+  top_products: ['ADMIN', 'MANAGER'],
+  // Read — operational (broader)
+  low_stock: ['ADMIN', 'MANAGER'],
+  search_product: ['ADMIN', 'MANAGER', 'WAITER', 'CASHIER', 'CHEF', 'BARTENDER'],
+  customer_lookup: ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER'],
+  // Write — admin/manager only
+  create_product: ['ADMIN', 'MANAGER'],
+  adjust_stock: ['ADMIN', 'MANAGER'],
+};
+
+/**
+ * Check if a role can execute an action. Unknown actions default to ADMIN-only.
+ */
+export function canRoleExecute(actionType: string, role: string): boolean {
+  const allowed = ACTION_ROLES[actionType];
+  if (!allowed) return role === 'ADMIN';
+  return allowed.includes(role);
+}
+
+/**
  * Parse an <action>...</action> block from the LLM response.
  * Returns null if no valid action is present.
  */

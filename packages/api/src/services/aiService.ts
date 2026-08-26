@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { ACTION_CATALOG, parseAction, executeAction, isKnownAction, isWriteAction } from './aiActions';
+import { ACTION_CATALOG, parseAction, executeAction, isKnownAction, isWriteAction, canRoleExecute } from './aiActions';
 
 /**
  * AI Assistant Service — per-tenant intelligent assistant.
@@ -16,6 +16,7 @@ import { ACTION_CATALOG, parseAction, executeAction, isKnownAction, isWriteActio
 interface AskOptions {
   tenantId: string;
   message: string;
+  userRole?: string;
   history?: { role: string; content: string }[];
   // If the user is confirming a pending write action
   confirmAction?: { type: string; params: Record<string, any> };
@@ -285,9 +286,19 @@ ${context}`;
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export const aiService = {
-  ask: async ({ tenantId, message, history, confirmAction }: AskOptions): Promise<AskResult> => {
+  ask: async ({ tenantId, message, userRole, history, confirmAction }: AskOptions): Promise<AskResult> => {
+    const role = userRole || 'WAITER';
+
     // ─── Case 1: User is confirming a pending write action ───
     if (confirmAction && isKnownAction(confirmAction.type)) {
+      // Enforce role permission before executing
+      if (!canRoleExecute(confirmAction.type, role)) {
+        return {
+          response: '🔒 No tienes permiso para ejecutar esta acción. Pídele a un administrador o gerente que la realice.',
+          provider: 'action',
+          action: { type: confirmAction.type, executed: false },
+        };
+      }
       const result = await executeAction(confirmAction, true);
       return {
         response: result.message || (result.ok ? '✅ Listo.' : '❌ No se pudo completar la acción.'),
@@ -313,6 +324,14 @@ export const aiService = {
     // ─── Case 2: LLM returned an action ───
     const action = parseAction(result.text);
     if (action && isKnownAction(action.type)) {
+      // Enforce role permission before executing
+      if (!canRoleExecute(action.type, role)) {
+        return {
+          response: '🔒 Esa acción está reservada para administradores o gerentes. No la puedo ejecutar con tu perfil actual.',
+          provider: result.provider,
+          action: { type: action.type, executed: false },
+        };
+      }
       const exec = await executeAction(action, false);
 
       if (exec.needsConfirmation) {
