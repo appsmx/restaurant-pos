@@ -350,4 +350,115 @@ export const reportService = {
       },
     };
   },
+
+  /**
+   * Comparativa de periodo actual vs periodo anterior equivalente.
+   * Ej: esta semana vs semana pasada, este mes vs mes pasado.
+   */
+  getComparison: async (period: string = 'week', from?: string, to?: string) => {
+    const current = getDateRange(period as any, from, to);
+
+    // Calcular el periodo anterior equivalente (mismo tamaño, justo antes)
+    const rangeDuration = current.to.getTime() - current.from.getTime();
+    const prevTo = new Date(current.from.getTime() - 1);
+    const prevFrom = new Date(prevTo.getTime() - rangeDuration);
+
+    const [currentOrders, prevOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: { status: 'CLOSED', closedAt: { gte: current.from, lte: current.to } },
+        include: { payments: true },
+      }),
+      prisma.order.findMany({
+        where: { status: 'CLOSED', closedAt: { gte: prevFrom, lte: prevTo } },
+        include: { payments: true },
+      }),
+    ]);
+
+    const calcStats = (orders: any[]) => {
+      const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
+      const totalOrders = orders.length;
+      const totalTips = orders.reduce((sum, o) => sum + o.payments.reduce((ps: number, p: any) => ps + (p.tip || 0), 0), 0);
+      return {
+        totalSales: Math.round(totalSales * 100) / 100,
+        totalOrders,
+        totalTips: Math.round(totalTips * 100) / 100,
+        avgTicket: totalOrders > 0 ? Math.round((totalSales / totalOrders) * 100) / 100 : 0,
+      };
+    };
+
+    const cur = calcStats(currentOrders);
+    const prev = calcStats(prevOrders);
+
+    // Calcular cambio porcentual
+    const pctChange = (curVal: number, prevVal: number): number => {
+      if (prevVal === 0) return curVal > 0 ? 100 : 0;
+      return Math.round(((curVal - prevVal) / prevVal) * 1000) / 10;
+    };
+
+    return {
+      period,
+      current: { from: current.from.toISOString(), to: current.to.toISOString(), ...cur },
+      previous: { from: prevFrom.toISOString(), to: prevTo.toISOString(), ...prev },
+      change: {
+        totalSales: pctChange(cur.totalSales, prev.totalSales),
+        totalOrders: pctChange(cur.totalOrders, prev.totalOrders),
+        avgTicket: pctChange(cur.avgTicket, prev.avgTicket),
+        totalTips: pctChange(cur.totalTips, prev.totalTips),
+      },
+    };
+  },
+
+  /**
+   * Empleado del mes — quien más ventas cerró en el mes actual.
+   * Devuelve el ranking completo + el ganador.
+   */
+  getEmployeeOfMonth: async (monthOffset: number = 0) => {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1, 0, 0, 0, 0);
+    const to = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0, 23, 59, 59, 999);
+
+    const closedOrders = await prisma.order.findMany({
+      where: { status: 'CLOSED', closedAt: { gte: from, lte: to } },
+      include: {
+        user: { select: { id: true, name: true, username: true, role: true } },
+        closedBy: { select: { id: true, name: true, username: true, role: true } },
+        payments: true,
+      },
+    });
+
+    // Ranking por quien creó la orden (mesero/vendedor)
+    const stats: Record<string, { id: string; name: string; role: string; orders: number; total: number; tips: number }> = {};
+
+    for (const order of closedOrders) {
+      const key = order.userId;
+      if (!stats[key]) {
+        stats[key] = { id: order.user.id, name: order.user.name, role: order.user.role, orders: 0, total: 0, tips: 0 };
+      }
+      stats[key].orders += 1;
+      stats[key].total += order.total;
+      stats[key].tips += order.payments.reduce((ps, p) => ps + (p.tip || 0), 0);
+    }
+
+    const ranking = Object.values(stats)
+      .map((s) => ({
+        ...s,
+        total: Math.round(s.total * 100) / 100,
+        tips: Math.round(s.tips * 100) / 100,
+        avgTicket: s.orders > 0 ? Math.round((s.total / s.orders) * 100) / 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const monthName = from.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+
+    return {
+      month: monthName,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      winner: ranking[0] || null,
+      ranking,
+    };
+  },
 };
+
+// Export the date range helper for reuse in routes (e.g. export endpoints)
+export { getDateRange };
