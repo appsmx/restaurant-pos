@@ -15,6 +15,7 @@ interface Product {
   id: string;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   price: number;
   categoryId: string;
   active: boolean;
@@ -48,6 +49,8 @@ export default function MenuAdmin() {
   const [prodDescription, setProdDescription] = useState('');
   const [prodPrice, setProdPrice] = useState('');
   const [prodCategoryId, setProdCategoryId] = useState('');
+  const [prodImageUrl, setProdImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // ==================== DATA FETCHING ====================
@@ -138,6 +141,7 @@ export default function MenuAdmin() {
     setProdDescription('');
     setProdPrice('');
     setProdCategoryId(categories.filter((c) => c.active)[0]?.id || '');
+    setProdImageUrl('');
     setEditingProduct(null);
     setModal('createProduct');
   };
@@ -147,8 +151,42 @@ export default function MenuAdmin() {
     setProdDescription(prod.description || '');
     setProdPrice(String(prod.price));
     setProdCategoryId(prod.categoryId);
+    setProdImageUrl(prod.imageUrl || '');
     setEditingProduct(prod);
     setModal('editProduct');
+  };
+
+  // Compress image client-side then upload to backend
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      // Compress + resize client-side using canvas (max 800px, JPEG 0.8)
+      const compressed = await compressImage(file, 800, 0.8);
+
+      const formData = new FormData();
+      formData.append('image', compressed, 'product.jpg');
+
+      const token = localStorage.getItem('pos_token');
+      const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${apiUrl}/upload/image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.message || 'Error al subir imagen');
+      } else {
+        setProdImageUrl(data.imageUrl);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al procesar la imagen');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -159,6 +197,7 @@ export default function MenuAdmin() {
         await apiClient(`/menu/products/${editingProduct.id}`, 'PATCH', {
           name: prodName,
           description: prodDescription || undefined,
+          imageUrl: prodImageUrl || '',
           price: parseFloat(prodPrice),
           categoryId: prodCategoryId,
         });
@@ -166,6 +205,7 @@ export default function MenuAdmin() {
         await apiClient('/menu/products', 'POST', {
           name: prodName,
           description: prodDescription || undefined,
+          imageUrl: prodImageUrl || undefined,
           price: parseFloat(prodPrice),
           categoryId: prodCategoryId,
         });
@@ -441,6 +481,51 @@ export default function MenuAdmin() {
                   placeholder="Descripción corta..."
                 />
               </div>
+
+              {/* Foto del producto */}
+              <div>
+                <label className="text-gray-400 text-xs mb-1 block">Foto del producto (opcional)</label>
+                <div className="flex items-center gap-3">
+                  {/* Preview */}
+                  <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-800 border border-gray-600 shrink-0 flex items-center justify-center">
+                    {prodImageUrl ? (
+                      <img src={prodImageUrl} alt="preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-gray-600 text-2xl">🍽️</span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                      id="product-image-upload"
+                      disabled={uploadingImage}
+                    />
+                    <label
+                      htmlFor="product-image-upload"
+                      className={`block w-full text-center py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                        uploadingImage
+                          ? 'bg-gray-700 text-gray-500'
+                          : 'bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30'
+                      }`}
+                    >
+                      {uploadingImage ? '⏳ Procesando...' : prodImageUrl ? '🔄 Cambiar foto' : '📷 Subir foto'}
+                    </label>
+                    {prodImageUrl && !uploadingImage && (
+                      <button
+                        type="button"
+                        onClick={() => setProdImageUrl('')}
+                        className="w-full text-center mt-1.5 text-red-400 hover:text-red-300 text-[11px] transition-colors"
+                      >
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-gray-600 text-[10px] mt-1">Se comprime automáticamente. Se ve en el menú digital.</p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-gray-400 text-xs mb-1 block">Precio ($)</label>
@@ -484,4 +569,54 @@ export default function MenuAdmin() {
       )}
     </div>
   );
+}
+
+
+// ==================== IMAGE COMPRESSION HELPER ====================
+
+/**
+ * Compress and resize an image client-side using a canvas.
+ * Keeps aspect ratio, caps the longest side at maxSize, exports as JPEG.
+ */
+function compressImage(file: File, maxSize: number, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+
+        // Scale down if larger than maxSize
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('No se pudo procesar la imagen'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('No se pudo comprimir la imagen'));
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Imagen inválida'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
 }

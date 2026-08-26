@@ -109,6 +109,7 @@ export const menuService = {
       data: {
         name: data.name,
         description: data.description || null,
+        imageUrl: data.imageUrl || null,
         price: data.price,
         categoryId: data.categoryId,
         type: data.type || 'STANDARD',
@@ -116,7 +117,7 @@ export const menuService = {
     });
   },
 
-  updateProduct: async (id: string, data: { name?: string; description?: string; price?: number; categoryId?: string; active?: boolean }) => {
+  updateProduct: async (id: string, data: { name?: string; description?: string; imageUrl?: string; price?: number; categoryId?: string; active?: boolean }) => {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new AppError('Producto no encontrado', 404);
 
@@ -125,6 +126,7 @@ export const menuService = {
       data: {
         ...(data.name !== undefined && { name: data.name }),
         ...(data.description !== undefined && { description: data.description || null }),
+        ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl || null }),
         ...(data.price !== undefined && { price: data.price }),
         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
         ...(data.active !== undefined && { active: data.active }),

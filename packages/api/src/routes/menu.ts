@@ -15,12 +15,14 @@ const createProductSchema = z.object({
   price: z.number().positive('El precio debe ser mayor a 0'),
   categoryId: z.string().uuid('El ID de categoría debe ser un UUID válido'),
   description: z.string().optional(),
+  imageUrl: z.string().optional(),
   type: z.enum(['STANDARD', 'COMBO', 'MODIFIER']).optional(),
 });
 
 const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  imageUrl: z.string().optional(),
   price: z.number().positive().optional(),
   categoryId: z.string().uuid().optional(),
   active: z.boolean().optional(),
