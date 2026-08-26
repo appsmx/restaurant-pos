@@ -5,11 +5,15 @@ import { createServer } from 'http';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { initSocket } from './lib/socket';
+import { apiLimiter } from './middleware/rateLimit';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Trust the first proxy (Render/Vercel) so rate-limit sees real client IPs
+app.set('trust proxy', 1);
 
 // CORS: permitir frontend local y producción
 const allowedOrigins = [
@@ -41,7 +45,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api', routes);
+// General rate limit on all API routes (brute-force / abuse protection)
+app.use('/api', apiLimiter, routes);
 
 app.use(errorHandler);
 
