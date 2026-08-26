@@ -25,6 +25,7 @@ export const menuService = {
         name: p.name,
         price: p.price,
         description: p.description,
+        imageUrl: (p as any).imageUrl || null,
         hasModifiers: p._count.modifiers > 0,
       })),
     }));
