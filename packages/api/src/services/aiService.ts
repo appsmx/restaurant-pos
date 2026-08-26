@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { ACTION_CATALOG, parseAction, executeAction, isKnownAction, isWriteAction } from './aiActions';
 
 /**
  * AI Assistant Service — per-tenant intelligent assistant.
@@ -16,11 +17,21 @@ interface AskOptions {
   tenantId: string;
   message: string;
   history?: { role: string; content: string }[];
+  // If the user is confirming a pending write action
+  confirmAction?: { type: string; params: Record<string, any> };
 }
 
 interface AskResult {
   response: string;
   provider: string;
+  // When the assistant executed a query/write action, structured info about it
+  action?: {
+    type: string;
+    executed: boolean;
+    needsConfirmation?: boolean;
+    params?: Record<string, any>;
+    summary?: string;
+  };
 }
 
 // ─── LLM Call ────────────────────────────────────────────────────────────────
@@ -266,29 +277,68 @@ REGLAS:
 6. NUNCA menciones "Logan", "tenant", "multi-tenant" ni nada técnico. Habla como si fueras parte del equipo del negocio.
 7. Si el dueño pregunta algo que no puedes responder con los datos disponibles, sugiere qué datos necesitaría registrar.
 
+${ACTION_CATALOG}
+
 ${context}`;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export const aiService = {
-  ask: async ({ tenantId, message, history }: AskOptions): Promise<AskResult> => {
-    // Build context from real tenant data
-    const context = await buildTenantContext(tenantId);
+  ask: async ({ tenantId, message, history, confirmAction }: AskOptions): Promise<AskResult> => {
+    // ─── Case 1: User is confirming a pending write action ───
+    if (confirmAction && isKnownAction(confirmAction.type)) {
+      const result = await executeAction(confirmAction, true);
+      return {
+        response: result.message || (result.ok ? '✅ Listo.' : '❌ No se pudo completar la acción.'),
+        provider: 'action',
+        action: { type: confirmAction.type, executed: result.ok },
+      };
+    }
 
     // Get tenant info for the system prompt
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { name: true, businessType: true },
     });
-
     if (!tenant) throw new Error('Tenant no encontrado');
 
+    // Build context from real tenant data
+    const context = await buildTenantContext(tenantId);
     const systemPrompt = buildSystemPrompt(tenant.name, tenant.businessType, context);
 
     // Call LLM with context + history
     const result = await callLLM(systemPrompt, message, history);
 
+    // ─── Case 2: LLM returned an action ───
+    const action = parseAction(result.text);
+    if (action && isKnownAction(action.type)) {
+      const exec = await executeAction(action, false);
+
+      if (exec.needsConfirmation) {
+        // Write action — ask the user to confirm before executing
+        return {
+          response: `Voy a ${exec.summary}. ¿Confirmas?`,
+          provider: result.provider,
+          action: {
+            type: action.type,
+            executed: false,
+            needsConfirmation: true,
+            params: action.params,
+            summary: exec.summary,
+          },
+        };
+      }
+
+      // Read action executed immediately — return its result
+      return {
+        response: exec.message || 'Aquí está la información.',
+        provider: result.provider,
+        action: { type: action.type, executed: exec.ok },
+      };
+    }
+
+    // ─── Case 3: Normal text answer ───
     return { response: result.text, provider: result.provider };
   },
 };

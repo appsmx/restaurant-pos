@@ -8,19 +8,30 @@ import { apiClient } from '../lib/apiClient';
  * "¿Cómo van las ventas hoy?", "¿Cuál es mi producto estrella?", etc.
  */
 
+interface PendingAction {
+  type: string;
+  params: Record<string, any>;
+  summary?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   pending?: boolean;
+  // If this assistant message proposes a write action awaiting confirmation
+  confirmAction?: PendingAction;
+  // Once resolved (confirmed/cancelled), hide the buttons
+  actionResolved?: boolean;
 }
 
 const SUGGESTIONS = [
   '¿Cómo van las ventas hoy?',
   '¿Cuál es mi producto más vendido?',
   '¿Quiénes son mis mejores clientes?',
-  'Dame un resumen de esta semana',
-  '¿Qué me recomiendas mejorar?',
+  '¿Cuánto vendí el 15 de este mes?',
+  'Busca el producto camarón',
+  'Crea el producto "Agua de Jamaica" a $25 en Bebidas',
 ];
 
 export default function Assistant() {
@@ -53,6 +64,48 @@ export default function Assistant() {
 
       const data = await apiClient('/ai/ask', 'POST', { message: msg, history });
 
+      // If the assistant proposes a write action that needs confirmation
+      const confirmAction = data.action?.needsConfirmation
+        ? { type: data.action.type, params: data.action.params, summary: data.action.summary }
+        : undefined;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingMsg.id ? { ...m, text: data.response, pending: false, confirmAction } : m
+        )
+      );
+    } catch (err: any) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingMsg.id
+            ? { ...m, text: err.message || 'Error al consultar el asistente', pending: false }
+            : m
+        )
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function confirmPendingAction(msgId: string, action: PendingAction, confirmed: boolean) {
+    // Mark this message's action as resolved so buttons disappear
+    setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, actionResolved: true } : m)));
+
+    if (!confirmed) {
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: 'assistant', text: 'De acuerdo, no hice ningún cambio.' },
+      ]);
+      return;
+    }
+
+    const pendingMsg: Message = { id: `a-${Date.now()}`, role: 'assistant', text: '', pending: true };
+    setMessages((prev) => [...prev, pendingMsg]);
+    setSending(true);
+    try {
+      const data = await apiClient('/ai/ask', 'POST', {
+        confirmAction: { type: action.type, params: action.params },
+      });
       setMessages((prev) =>
         prev.map((m) => (m.id === pendingMsg.id ? { ...m, text: data.response, pending: false } : m))
       );
@@ -60,7 +113,7 @@ export default function Assistant() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === pendingMsg.id
-            ? { ...m, text: err.message || 'Error al consultar el asistente', pending: false }
+            ? { ...m, text: err.message || 'Error al ejecutar la acción', pending: false }
             : m
         )
       );
@@ -77,7 +130,7 @@ export default function Assistant() {
           🤖 Asistente IA
         </h1>
         <p className="text-gray-500 text-xs mt-1">
-          Pregúntame sobre tus ventas, productos, clientes o pide recomendaciones
+          Pregúntame sobre tus ventas o pídeme acciones: crear productos, buscar clientes, consultar ventas de una fecha
         </p>
       </div>
 
@@ -102,7 +155,7 @@ export default function Assistant() {
         )}
 
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div
               className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
                 m.role === 'user'
@@ -119,6 +172,26 @@ export default function Assistant() {
                 m.text
               )}
             </div>
+
+            {/* Confirmation buttons for write actions */}
+            {m.confirmAction && !m.actionResolved && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => confirmPendingAction(m.id, m.confirmAction!, true)}
+                  disabled={sending}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
+                >
+                  ✓ Confirmar
+                </button>
+                <button
+                  onClick={() => confirmPendingAction(m.id, m.confirmAction!, false)}
+                  disabled={sending}
+                  className="bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
