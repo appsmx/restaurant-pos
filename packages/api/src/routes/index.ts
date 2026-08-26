@@ -15,6 +15,7 @@ import reservationRoutes from './reservations';
 import tenantRoutes from './tenant';
 import adminRoutes from './admin';
 import importRoutes from './import';
+import uploadRoutes from './upload';
 import aiRoutes from './ai';
 import { menuService } from '../services/menuService';
 import { prisma } from '../lib/prisma';
@@ -104,5 +105,6 @@ router.use('/admin', adminRoutes);
 
 // ==================== IMPORT (auth + ADMIN) ====================
 router.use('/import', importRoutes);
+router.use('/upload', uploadRoutes);
 
 export default router;
