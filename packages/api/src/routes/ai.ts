@@ -29,13 +29,16 @@ router.use(auth);
  */
 router.post('/ask', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, confirmAction } = req.body;
 
-    if (!message || typeof message !== 'string' || !message.trim()) {
+    // confirmAction path: user is confirming a pending write action
+    const isConfirming = confirmAction && typeof confirmAction.type === 'string';
+
+    if (!isConfirming && (!message || typeof message !== 'string' || !message.trim())) {
       return res.status(400).json({ error: 'Mensaje vacío', hint: 'Envía un campo "message" con tu pregunta.' });
     }
 
-    if (message.length > 2000) {
+    if (message && message.length > 2000) {
       return res.status(400).json({ error: 'Mensaje demasiado largo (máx 2000 caracteres)' });
     }
 
@@ -46,8 +49,9 @@ router.post('/ask', async (req: AuthRequest, res: Response, next: NextFunction) 
 
     const result = await aiService.ask({
       tenantId,
-      message: message.trim(),
+      message: (message || '').trim(),
       history: Array.isArray(history) ? history.slice(-10) : [], // Max 10 turns of history
+      confirmAction: isConfirming ? confirmAction : undefined,
     });
 
     res.json(result);
