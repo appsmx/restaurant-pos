@@ -17,15 +17,32 @@ import adminRoutes from './admin';
 import importRoutes from './import';
 import aiRoutes from './ai';
 import { menuService } from '../services/menuService';
+import { prisma } from '../lib/prisma';
 import { moduleGuard } from '../middleware/moduleGuard';
 
 const router = Router();
 
 // ==================== PUBLIC ROUTES (no auth) ====================
 
-// GET /api/public/menu — menú digital para clientes (QR)
+// GET /api/public/menu?slug=quiroa — menú digital para clientes (QR)
 router.get('/public/menu', async (req, res, next) => {
   try {
+    const { slug } = req.query;
+    if (slug) {
+      const { runWithTenant } = require('../lib/tenantContext');
+      const tenant = await prisma.tenant.findUnique({ where: { slug: slug as string } });
+      if (!tenant || !tenant.active) {
+        return res.status(404).json({ message: 'Negocio no encontrado' });
+      }
+      const categories = await new Promise((resolve, reject) => {
+        runWithTenant(tenant.id, async () => {
+          try { resolve(await menuService.getCategories()); }
+          catch (e: any) { reject(e); }
+        });
+      });
+      return res.json(categories);
+    }
+    // No slug — unscoped (backward compat for single-tenant)
     const categories = await menuService.getCategories();
     res.json(categories);
   } catch (error) {
@@ -33,10 +50,19 @@ router.get('/public/menu', async (req, res, next) => {
   }
 });
 
-// GET /api/public/config — nombre del restaurante para el menú público
+// GET /api/public/config?slug=quiroa — nombre del restaurante para el menú público
 router.get('/public/config', async (req, res, next) => {
   try {
-    const { prisma } = require('../lib/prisma');
+    const { slug } = req.query;
+    if (slug) {
+      const tenant = await prisma.tenant.findUnique({ where: { slug: slug as string } });
+      if (!tenant || !tenant.active) {
+        return res.status(404).json({ message: 'Negocio no encontrado' });
+      }
+      const config = await prisma.restaurantConfig.findFirst({ where: { tenantId: tenant.id } });
+      return res.json({ name: config?.name || tenant.name, phone: config?.phone || null, slug: tenant.slug });
+    }
+    // No slug — unscoped (backward compat)
     const config = await prisma.restaurantConfig.findUnique({ where: { id: 'main' } });
     res.json({ name: config?.name || 'Restaurante', phone: config?.phone || null });
   } catch (error) {

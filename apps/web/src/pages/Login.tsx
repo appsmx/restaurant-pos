@@ -4,31 +4,135 @@ import { apiClient } from '../lib/apiClient';
 
 type LoginMode = 'pin' | 'credentials';
 
+interface TenantData {
+  id: string;
+  slug: string;
+  name: string;
+  businessType: string;
+  config: any;
+}
+
 export default function Login() {
   const [mode, setMode] = useState<LoginMode>('pin');
-  const [restaurantName, setRestaurantName] = useState('POS Restaurante');
+  const [tenantData, setTenantData] = useState<TenantData | null>(null);
+  const [tenantLoading, setTenantLoading] = useState(false);
+  const [tenantError, setTenantError] = useState('');
+  const [showSlugInput, setShowSlugInput] = useState(false);
+  const [slugInput, setSlugInput] = useState('');
+  const { tenantSlug, setTenantSlug } = useAuthStore();
 
+  // Resolve tenant from URL param (?t=slug) or stored slug
   useEffect(() => {
-    apiClient('/config', 'GET').then((config) => {
-      if (config?.name) setRestaurantName(config.name);
-    }).catch(() => {});
+    const params = new URLSearchParams(window.location.search);
+    const urlSlug = params.get('t') || params.get('tenant') || params.get('slug');
+
+    const effectiveSlug = urlSlug || tenantSlug;
+
+    if (effectiveSlug) {
+      resolveTenant(effectiveSlug);
+    }
   }, []);
+
+  const resolveTenant = async (slug: string) => {
+    setTenantLoading(true);
+    setTenantError('');
+    try {
+      const data = await apiClient(`/auth/tenant/${slug}`, 'GET');
+      setTenantData(data);
+      setTenantSlug(slug);
+      setShowSlugInput(false);
+    } catch (err: any) {
+      setTenantError(err.message || 'Negocio no encontrado');
+      setTenantData(null);
+    } finally {
+      setTenantLoading(false);
+    }
+  };
+
+  const handleSlugSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (slugInput.trim()) {
+      resolveTenant(slugInput.trim().toLowerCase());
+    }
+  };
+
+  const handleChangeTenant = () => {
+    setTenantData(null);
+    setTenantSlug(null);
+    setShowSlugInput(true);
+    setTenantError('');
+  };
+
+  // Determine display name
+  const displayName = tenantData?.name || 'POS Restaurante';
+  const effectiveSlug = tenantData?.slug || tenantSlug || undefined;
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
+        {/* Logo / Branding */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mb-3">
-            {restaurantName[0]?.toUpperCase() || 'P'}
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl mb-3 shadow-lg shadow-blue-600/20">
+            {displayName[0]?.toUpperCase() || 'P'}
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-white">{restaurantName}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-white">{displayName}</h1>
+          {tenantData && (
+            <button
+              onClick={handleChangeTenant}
+              className="text-gray-500 hover:text-gray-300 text-xs mt-1 transition-colors"
+            >
+              {tenantData.slug} · cambiar ↗
+            </button>
+          )}
         </div>
 
-        {mode === 'pin' ? (
-          <PinLogin onSwitchMode={() => setMode('credentials')} />
-        ) : (
-          <CredentialsLogin onSwitchMode={() => setMode('pin')} />
+        {/* Tenant loading */}
+        {tenantLoading && (
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">Conectando...</p>
+          </div>
+        )}
+
+        {/* Slug input (when no tenant is set or user wants to change) */}
+        {!tenantData && !tenantLoading && (showSlugInput || !tenantSlug) && (
+          <div className="bg-gray-800 p-6 rounded-2xl mb-4">
+            <p className="text-gray-300 text-sm text-center mb-4">¿A qué negocio quieres entrar?</p>
+            <form onSubmit={handleSlugSubmit} className="space-y-3">
+              <input
+                type="text"
+                value={slugInput}
+                onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                className="w-full p-3.5 bg-gray-700 text-white rounded-xl border border-gray-600 focus:border-blue-500 focus:outline-none text-center text-lg font-mono"
+                placeholder="mi-negocio"
+                autoFocus
+              />
+              {tenantError && (
+                <p className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded-lg">{tenantError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={!slugInput.trim()}
+                className="w-full p-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-xl font-medium transition-colors"
+              >
+                Continuar →
+              </button>
+            </form>
+            <p className="text-gray-600 text-[10px] text-center mt-3">
+              Ingresa el identificador de tu negocio (ej: quiroa, mi-cafe)
+            </p>
+          </div>
+        )}
+
+        {/* Login form (only when tenant is resolved or no slug required) */}
+        {(tenantData || (!showSlugInput && !tenantSlug)) && !tenantLoading && (
+          <>
+            {mode === 'pin' ? (
+              <PinLogin onSwitchMode={() => setMode('credentials')} slug={effectiveSlug} />
+            ) : (
+              <CredentialsLogin onSwitchMode={() => setMode('pin')} slug={effectiveSlug} />
+            )}
+          </>
         )}
 
         {/* Logan watermark */}
@@ -49,7 +153,7 @@ export default function Login() {
 
 // ==================== PIN LOGIN ====================
 
-function PinLogin({ onSwitchMode }: { onSwitchMode: () => void }) {
+function PinLogin({ onSwitchMode, slug }: { onSwitchMode: () => void; slug?: string }) {
   const [pin, setPin] = useState<string>('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,7 +180,7 @@ function PinLogin({ onSwitchMode }: { onSwitchMode: () => void }) {
 
   const submitPin = async (pinValue: string) => {
     setLoading(true);
-    const success = await loginWithPin(pinValue);
+    const success = await loginWithPin(pinValue, slug);
     if (!success) {
       setError('PIN incorrecto');
       setShake(true);
@@ -168,7 +272,7 @@ function PinLogin({ onSwitchMode }: { onSwitchMode: () => void }) {
 
 // ==================== CREDENTIALS LOGIN (fallback) ====================
 
-function CredentialsLogin({ onSwitchMode }: { onSwitchMode: () => void }) {
+function CredentialsLogin({ onSwitchMode, slug }: { onSwitchMode: () => void; slug?: string }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -179,7 +283,7 @@ function CredentialsLogin({ onSwitchMode }: { onSwitchMode: () => void }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const success = await login(username, password);
+    const success = await login(username, password, slug);
     if (!success) {
       setError('Credenciales incorrectas');
     }
