@@ -14,6 +14,15 @@ interface PendingAction {
   summary?: string;
 }
 
+interface ProactiveAlert {
+  id: string;
+  severity: 'critical' | 'warning' | 'info' | 'success';
+  icon: string;
+  title: string;
+  message: string;
+  action?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -39,12 +48,21 @@ export default function Assistant() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
+  const [alertsDismissed, setAlertsDismissed] = useState(false);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Fetch proactive alerts on mount
+  useEffect(() => {
+    apiClient('/ai/alerts', 'GET')
+      .then((data) => setAlerts(data.alerts || []))
+      .catch(() => {});
+  }, []);
 
   async function send(text?: string) {
     const msg = (text || input).trim();
@@ -133,6 +151,39 @@ export default function Assistant() {
           Pregúntame sobre tus ventas o pídeme acciones: crear productos, buscar clientes, consultar ventas de una fecha
         </p>
       </div>
+
+      {/* Proactive Alerts (shown when chat is empty and there are alerts) */}
+      {messages.length === 0 && alerts.length > 0 && !alertsDismissed && (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-gray-400 flex items-center gap-1.5">
+              🔔 {alerts.length} {alerts.length === 1 ? 'cosa que debes saber' : 'cosas que debes saber'}
+            </p>
+            <button onClick={() => setAlertsDismissed(true)} className="text-xs text-gray-600 hover:text-gray-400">
+              Ocultar
+            </button>
+          </div>
+          {alerts.map((a) => {
+            const styles: Record<string, string> = {
+              critical: 'bg-red-500/10 border-red-500/30',
+              warning: 'bg-amber-500/10 border-amber-500/30',
+              info: 'bg-blue-500/10 border-blue-500/30',
+              success: 'bg-green-500/10 border-green-500/30',
+            };
+            return (
+              <div key={a.id} className={`rounded-xl border p-3 ${styles[a.severity]}`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">{a.icon}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{a.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{a.message}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2">
