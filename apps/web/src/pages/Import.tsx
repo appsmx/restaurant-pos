@@ -35,12 +35,69 @@ const IMPORT_TYPES: { type: ImportType; label: string; icon: string; description
   },
 ];
 
+const apiBase = () => (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+const authHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem('pos_token')}`,
+  'Content-Type': 'application/json',
+});
+
 export default function Import() {
+  const [mode, setMode] = useState<'csv' | 'api'>('csv');
   const [selectedType, setSelectedType] = useState<ImportType | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState('');
+
+  // --- Estado del importador vía API de Loyverse ---
+  const [token, setToken] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [merchant, setMerchant] = useState<{ businessName: string; email: string; country: string } | null>(null);
+  const [apiImporting, setApiImporting] = useState<ImportType | null>(null);
+  const [apiError, setApiError] = useState('');
+
+  const handleTestConnection = async () => {
+    if (!token.trim()) return;
+    setTesting(true);
+    setApiError('');
+    setMerchant(null);
+    setResult(null);
+    try {
+      const res = await fetch(`${apiBase()}/import/loyverse/test`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) setApiError(data.message || 'No se pudo conectar con Loyverse');
+      else setMerchant({ businessName: data.businessName, email: data.email, country: data.country });
+    } catch (err: any) {
+      setApiError(err.message || 'Error de conexión');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleApiImport = async (type: ImportType) => {
+    if (!token.trim()) return;
+    setApiImporting(type);
+    setApiError('');
+    setResult(null);
+    try {
+      const res = await fetch(`${apiBase()}/import/loyverse/${type}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) setApiError(data.message || 'Error al importar');
+      else setResult(data);
+    } catch (err: any) {
+      setApiError(err.message || 'Error de conexión');
+    } finally {
+      setApiImporting(null);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -61,12 +118,9 @@ export default function Import() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const token = localStorage.getItem('pos_token');
-      const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
-
-      const response = await fetch(`${apiUrl}/import/${selectedType}`, {
+      const response = await fetch(`${apiBase()}/import/${selectedType}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('pos_token')}` },
         body: formData,
       });
 
@@ -96,12 +150,110 @@ export default function Import() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl md:text-2xl font-bold">🔄 Importar Datos</h1>
-          <p className="text-gray-500 text-xs md:text-sm mt-0.5">Migrar desde Loyverse POS u otro sistema (formato CSV)</p>
+          <p className="text-gray-500 text-xs md:text-sm mt-0.5">Migrar desde Loyverse POS: conexión directa por API o archivo CSV</p>
         </div>
       </div>
 
-      {/* Step 1: Select import type */}
-      {!selectedType && (
+      {/* Mode toggle: API vs CSV */}
+      <div className="flex gap-2 mb-5 bg-gray-800/50 p-1 rounded-xl w-full sm:w-auto sm:inline-flex">
+        <button
+          onClick={() => { setMode('api'); setSelectedType(null); setResult(null); setError(''); }}
+          className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'api' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          🔗 Conexión API
+        </button>
+        <button
+          onClick={() => { setMode('csv'); setResult(null); setApiError(''); }}
+          className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'csv' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          📄 Archivo CSV
+        </button>
+      </div>
+
+      {/* ==================== MODO API DE LOYVERSE ==================== */}
+      {mode === 'api' && (
+        <div className="space-y-4">
+          {/* Token input */}
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+            <label className="block text-white font-semibold text-sm mb-1">🔑 Access Token de Loyverse</label>
+            <p className="text-gray-500 text-xs mb-3">
+              Loyverse Back Office → <span className="text-gray-400">Integraciones → Access tokens</span> → crea un token con permiso de lectura.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => { setToken(e.target.value); setMerchant(null); setApiError(''); }}
+                placeholder="Pega tu token aquí..."
+                className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                onClick={handleTestConnection}
+                disabled={!token.trim() || testing}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+              >
+                {testing ? '⏳ Probando...' : '🔌 Probar conexión'}
+              </button>
+            </div>
+
+            {apiError && (
+              <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <p className="text-red-400 text-sm">❌ {apiError}</p>
+              </div>
+            )}
+
+            {merchant && (
+              <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                <p className="text-emerald-400 text-sm font-semibold">✅ Conectado: {merchant.businessName}</p>
+                {merchant.email && <p className="text-gray-400 text-xs mt-0.5">{merchant.email} {merchant.country && `· ${merchant.country}`}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Import buttons (enabled after successful connection) */}
+          {merchant && !result && (
+            <div className="space-y-3">
+              <p className="text-gray-400 text-sm">Elige qué datos migrar. Puedes ejecutar cada uno por separado:</p>
+              {IMPORT_TYPES.map((imp) => (
+                <div key={imp.type} className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center gap-3">
+                  <span className="text-3xl">{imp.icon}</span>
+                  <div className="flex-1">
+                    <h3 className="text-white font-semibold text-sm">{imp.label}</h3>
+                    <p className="text-gray-400 text-xs mt-0.5">{imp.description}</p>
+                  </div>
+                  <button
+                    onClick={() => handleApiImport(imp.type)}
+                    disabled={apiImporting !== null}
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {apiImporting === imp.type ? '⏳ Importando...' : '⬇️ Importar'}
+                  </button>
+                </div>
+              ))}
+              <p className="text-gray-600 text-[10px] text-center">
+                ⚠️ Recomendado: importa primero Productos, luego Clientes y al final Historial de ventas.
+              </p>
+            </div>
+          )}
+
+          {/* Info box */}
+          {!merchant && (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
+              <h3 className="text-blue-400 text-sm font-semibold mb-2">💡 ¿Cómo obtener tu Access Token?</h3>
+              <ol className="text-gray-400 text-xs space-y-1.5 list-decimal list-inside">
+                <li>Inicia sesión en <a href="https://r.loyverse.com/dashboard" target="_blank" rel="noopener" className="text-blue-400 underline">Loyverse Back Office</a></li>
+                <li>Ve a <span className="text-gray-300">Integraciones → Access tokens</span></li>
+                <li>Haz clic en <span className="text-gray-300">"+ Añadir token de acceso"</span></li>
+                <li>Copia el token generado y pégalo arriba</li>
+                <li>Prueba la conexión y luego importa tus datos</li>
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 1: Select import type (CSV mode) */}
+      {mode === 'csv' && !selectedType && (
         <div className="space-y-3">
           <p className="text-gray-400 text-sm mb-3">¿Qué datos quieres importar?</p>
           {IMPORT_TYPES.map((imp) => (
@@ -244,20 +396,29 @@ export default function Import() {
             )}
 
             {/* Actions */}
-            <div className="flex gap-2">
+            {mode === 'api' ? (
               <button
-                onClick={resetForm}
-                className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl transition-colors"
+                onClick={() => { setResult(null); setApiError(''); }}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
               >
                 ← Importar más datos
               </button>
-              <button
-                onClick={() => { setResult(null); setFile(null); }}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                🔄 Reimportar mismo tipo
-              </button>
-            </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={resetForm}
+                  className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-xl transition-colors"
+                >
+                  ← Importar más datos
+                </button>
+                <button
+                  onClick={() => { setResult(null); setFile(null); }}
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+                >
+                  🔄 Reimportar mismo tipo
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
