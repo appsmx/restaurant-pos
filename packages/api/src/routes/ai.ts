@@ -65,4 +65,23 @@ router.post('/ask', aiLimiter, async (req: AuthRequest, res: Response, next: Nex
   }
 });
 
+/**
+ * GET /api/ai/alerts
+ *
+ * Returns proactive alerts for the tenant — situations that need attention
+ * detected automatically (cash open too long, sales down, low stock,
+ * inactive VIP customer). No LLM needed — fast rule-based analysis.
+ *
+ * Response: { alerts: ProactiveAlert[] }
+ */
+router.get('/alerts', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { alertService } = require('../services/alertService');
+    const alerts = await alertService.getAlerts();
+    res.json({ alerts });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
