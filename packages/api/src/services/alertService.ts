@@ -30,6 +30,14 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
 
+/**
+ * Formatea una cantidad a máximo 1 decimal, evitando ruido de punto flotante.
+ * Ej: 4.000000001 → "4", 3.56 → "3.6", 2.830000000000001 → "2.8"
+ */
+function fmtQty(n: number): string {
+  return parseFloat(n.toFixed(1)).toString();
+}
+
 function endOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 }
@@ -185,7 +193,7 @@ export const alertService = {
       const alerts: ProactiveAlert[] = [];
 
       if (critical.length > 0) {
-        const names = critical.map((i) => `${i.name} (${i.stock} ${i.unit})`).join(', ');
+        const names = critical.map((i) => `${i.name} (${fmtQty(i.stock)} ${i.unit})`).join(', ');
         alerts.push({
           id: 'stock-critical',
           severity: 'critical',
@@ -197,7 +205,7 @@ export const alertService = {
       }
 
       if (low.length > 0) {
-        const names = low.map((i) => `${i.name} (${i.stock} ${i.unit})`).join(', ');
+        const names = low.map((i) => `${i.name} (${fmtQty(i.stock)} ${i.unit})`).join(', ');
         alerts.push({
           id: 'stock-low',
           severity: 'warning',
