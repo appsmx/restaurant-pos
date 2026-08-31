@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import DrilldownModal, { DrilldownFilters } from '../components/DrilldownModal';
+import { fmtQty } from '../lib/format';
 
 interface Summary {
   period: string;
@@ -234,7 +235,7 @@ export default function Dashboard() {
                   alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
                 }`}
               >
-                {alert.name}: {alert.stock} {alert.unit}
+                {alert.name}: {fmtQty(alert.stock)} {alert.unit}
               </span>
             ))}
             {stockAlerts.length > 6 && (

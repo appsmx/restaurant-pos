@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { fmtQty } from '../lib/format';
 
 /**
  * Proactive Alerts Service
@@ -28,14 +29,6 @@ export interface ProactiveAlert {
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-}
-
-/**
- * Formatea una cantidad a máximo 1 decimal, evitando ruido de punto flotante.
- * Ej: 4.000000001 → "4", 3.56 → "3.6", 2.830000000000001 → "2.8"
- */
-function fmtQty(n: number): string {
-  return parseFloat(n.toFixed(1)).toString();
 }
 
 function endOfDay(d: Date): Date {

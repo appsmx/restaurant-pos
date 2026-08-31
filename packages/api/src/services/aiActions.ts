@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { fmtQty } from '../lib/format';
 
 /**
  * AI Assistant Actions — safe, structured operations the assistant can execute.
@@ -164,7 +165,7 @@ export async function executeAction(action: ActionRequest, confirmed: boolean): 
       message: ingredients.length === 0
         ? `Todo bien: ningún ingrediente por debajo de ${threshold}.`
         : `Ingredientes con stock bajo (≤${threshold}):\n` +
-          ingredients.map((i) => `- ${i.name}: ${i.stock} ${i.unit}`).join('\n'),
+          ingredients.map((i) => `- ${i.name}: ${fmtQty(i.stock)} ${i.unit}`).join('\n'),
     };
   }
 
@@ -240,12 +241,12 @@ export async function executeAction(action: ActionRequest, confirmed: boolean): 
     if (!ing) return { ok: false, message: `No encontré el ingrediente "${ingredient}".` };
 
     const newStock = Number(quantity);
-    const summary = `Ajustar stock de "${ing.name}" de ${ing.stock} a ${newStock} ${ing.unit}`;
+    const summary = `Ajustar stock de "${ing.name}" de ${fmtQty(ing.stock)} a ${fmtQty(newStock)} ${ing.unit}`;
     if (!confirmed) {
       return { ok: true, needsConfirmation: true, actionType: type, params, summary };
     }
     await prisma.ingredient.update({ where: { id: ing.id }, data: { stock: newStock } });
-    return { ok: true, data: { ingredient: ing.name, newStock }, message: `✅ Stock de "${ing.name}" ajustado a ${newStock} ${ing.unit}.` };
+    return { ok: true, data: { ingredient: ing.name, newStock }, message: `✅ Stock de "${ing.name}" ajustado a ${fmtQty(newStock)} ${ing.unit}.` };
   }
 
   return { ok: false, message: `Acción no reconocida: ${type}` };
