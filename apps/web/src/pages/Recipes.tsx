@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/apiClient';
+import { fmtQty } from '../lib/format';
 
 // ==================== INTERFACES ====================
 
@@ -325,7 +326,7 @@ export default function Recipes() {
                           )}
                         </div>
                         <p className="text-gray-500 text-xs mt-0.5">
-                          Stock actual: <span className={ri.ingredient.stock <= 3 ? 'text-red-400' : ri.ingredient.stock <= 10 ? 'text-amber-400' : 'text-emerald-400'}>{ri.ingredient.stock}</span> {ri.ingredient.unit}
+                          Stock actual: <span className={ri.ingredient.stock <= 3 ? 'text-red-400' : ri.ingredient.stock <= 10 ? 'text-amber-400' : 'text-emerald-400'}>{fmtQty(ri.ingredient.stock)}</span> {ri.ingredient.unit}
                         </p>
                       </div>
 
@@ -364,7 +365,7 @@ export default function Recipes() {
                               className="px-2.5 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded-lg transition-colors"
                               title="Editar cantidad"
                             >
-                              <span className="font-mono font-bold text-blue-400">{ri.quantity}</span>
+                              <span className="font-mono font-bold text-blue-400">{fmtQty(ri.quantity)}</span>
                               <span className="text-gray-400 ml-1">{ri.ingredient.unit}</span>
                             </button>
                             <button
@@ -423,7 +424,7 @@ export default function Recipes() {
                     <option value="">Seleccionar ingrediente...</option>
                     {availableIngredients.map((ing) => (
                       <option key={ing.id} value={ing.id}>
-                        {ing.name} ({ing.stock} {ing.unit} disponibles)
+                        {ing.name} ({fmtQty(ing.stock)} {ing.unit} disponibles)
                       </option>
                     ))}
                   </select>

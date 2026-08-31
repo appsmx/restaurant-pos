@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { fmtQty } from '../lib/format';
 
 /**
  * Proactive Alerts Service
@@ -185,7 +186,7 @@ export const alertService = {
       const alerts: ProactiveAlert[] = [];
 
       if (critical.length > 0) {
-        const names = critical.map((i) => `${i.name} (${i.stock} ${i.unit})`).join(', ');
+        const names = critical.map((i) => `${i.name} (${fmtQty(i.stock)} ${i.unit})`).join(', ');
         alerts.push({
           id: 'stock-critical',
           severity: 'critical',
@@ -197,7 +198,7 @@ export const alertService = {
       }
 
       if (low.length > 0) {
-        const names = low.map((i) => `${i.name} (${i.stock} ${i.unit})`).join(', ');
+        const names = low.map((i) => `${i.name} (${fmtQty(i.stock)} ${i.unit})`).join(', ');
         alerts.push({
           id: 'stock-low',
           severity: 'warning',
