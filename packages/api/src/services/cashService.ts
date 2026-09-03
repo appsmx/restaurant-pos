@@ -27,24 +27,31 @@ export const cashService = {
     const existing = await prisma.cashRegister.findFirst({ where: { status: 'OPEN' } });
     if (existing) throw new AppError('Ya hay una caja abierta. Ciérrala antes de abrir otra.', 400);
 
+    // Nota: se crean por separado (no con nested create) porque la extensión
+    // multi-tenant de Prisma solo inyecta tenantId en creates de nivel superior,
+    // no en los anidados — un nested create fallaría por falta de tenantId.
     const register = await prisma.cashRegister.create({
       data: {
         openingAmount,
         openedBy: userId,
         status: 'OPEN',
-        movements: {
-          create: {
-            type: 'OPENING',
-            amount: openingAmount,
-            description: 'Apertura de caja',
-            userId,
-          },
-        },
       },
-      include: { movements: true },
     });
 
-    return register;
+    await prisma.cashMovement.create({
+      data: {
+        registerId: register.id,
+        type: 'OPENING',
+        amount: openingAmount,
+        description: 'Apertura de caja',
+        userId,
+      },
+    });
+
+    return prisma.cashRegister.findFirst({
+      where: { id: register.id },
+      include: { movements: true },
+    });
   },
 
   /**
