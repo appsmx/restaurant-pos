@@ -190,7 +190,7 @@ function TenantsTab() {
                     )}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {t.slug}.logancorp.mx · {t.businessType.toLowerCase()} · ${t.monthlyRate}/mes
+                    {t.slug}.loganos.com · {t.businessType.toLowerCase()} · ${t.monthlyRate}/mes
                   </div>
                 </div>
               </div>
@@ -319,7 +319,7 @@ function TenantDetailModal({ tenantId, onClose, onUpdated }: { tenantId: string;
                 </div>
                 <div>
                   <h2 className="text-white font-bold text-lg">{tenant.name}</h2>
-                  <p className="text-gray-500 text-xs">{tenant.slug}.logancorp.mx · {tenant.businessType?.toLowerCase()}</p>
+                  <p className="text-gray-500 text-xs">{tenant.slug}.loganos.com · {tenant.businessType?.toLowerCase()}</p>
                 </div>
               </div>
               <button onClick={onClose} className="text-gray-400 hover:text-white text-xl p-1">✕</button>
@@ -582,7 +582,7 @@ function CreateTenantTab({ onCreated }: { onCreated: () => void }) {
           <Field label="Slug (URL) *" value={form.slug} onChange={(v) => update('slug', v)} placeholder="barberia-mike" />
           {form.slug.length >= 2 && (
             <p className={`text-xs mt-1 ${slugAvailable === true ? 'text-green-400' : slugAvailable === false ? 'text-red-400' : 'text-gray-500'}`}>
-              {slugAvailable === true && `✅ ${form.slug}.logancorp.mx disponible`}
+              {slugAvailable === true && `✅ ${form.slug}.loganos.com disponible`}
               {slugAvailable === false && '❌ Este slug ya está en uso'}
               {slugAvailable === null && 'Verificando...'}
             </p>

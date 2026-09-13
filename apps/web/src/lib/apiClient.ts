@@ -3,8 +3,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 /**
  * Get the tenant slug from the current URL.
  * Supports:
- *   - Subdomain: quiroa.logancorp.mx → "quiroa"
- *   - Path prefix: logancorp.mx/t/quiroa/... → "quiroa" (if app is mounted there)
+ *   - Subdomain: quiroa.loganos.com → "quiroa"
+ *   - Path prefix: loganos.com/t/quiroa/... → "quiroa" (if app is mounted there)
  *   - localStorage fallback: set during login response
  *
  * Returns null if no tenant can be determined (dev/single-tenant mode).
@@ -16,7 +16,7 @@ function getTenantSlug(): string | null {
 
   // Strategy 2: Extract from subdomain
   const hostname = window.location.hostname;
-  const knownBases = ['logancorp.mx', 'logancorp.vercel.app', 'localhost'];
+  const knownBases = ['loganos.com', 'logancorp.mx', 'logancorp.vercel.app', 'localhost'];
   for (const base of knownBases) {
     if (hostname.endsWith(`.${base}`)) {
       const subdomain = hostname.slice(0, -(base.length + 1)).split('.')[0];
