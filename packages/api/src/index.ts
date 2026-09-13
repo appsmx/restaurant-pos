@@ -19,6 +19,8 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  // Dominios oficiales del POS bajo la marca Logan (loganos.com)
+  'https://pdv.loganos.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
