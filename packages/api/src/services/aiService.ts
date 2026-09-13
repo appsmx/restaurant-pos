@@ -40,11 +40,11 @@ interface AskResult {
 const LOGAN_LLM_URL = process.env.LOGAN_LLM_URL || 'https://logancorp.vercel.app/api/llm';
 const LOGAN_LLM_SECRET = process.env.LOGAN_LLM_SECRET || '';
 
-async function callLLM(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[]): Promise<{ text: string; provider: string }> {
+async function callLLM(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[], tenantName?: string): Promise<{ text: string; provider: string }> {
   // Strategy 1: Use Logan LLM Proxy (centralized, no local keys needed)
   if (LOGAN_LLM_URL) {
     try {
-      return await callLoganProxy(systemPrompt, userMessage, history);
+      return await callLoganProxy(systemPrompt, userMessage, history, tenantName);
     } catch (e) {
       console.warn('[ai] Logan proxy failed:', (e as Error).message, '— trying direct providers...');
     }
@@ -81,7 +81,7 @@ async function callLLM(systemPrompt: string, userMessage: string, history?: { ro
  * Call the Logan LLM Proxy (centralized multi-provider endpoint)
  * This is the preferred method — no API keys needed on this service.
  */
-async function callLoganProxy(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[]): Promise<{ text: string; provider: string }> {
+async function callLoganProxy(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[], tenantName?: string): Promise<{ text: string; provider: string }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (LOGAN_LLM_SECRET) {
     headers['Authorization'] = `Bearer ${LOGAN_LLM_SECRET}`;
@@ -97,6 +97,9 @@ async function callLoganProxy(systemPrompt: string, userMessage: string, history
       history: history || [],
       maxTokens: 2048,
       temperature: 0.7,
+      // Control de gasto de IA en Logan OS: identifica el producto y el negocio.
+      project: 'restaurant-pos',
+      ...(tenantName ? { tenant: tenantName } : {}),
     }),
   });
 
@@ -318,8 +321,8 @@ export const aiService = {
     const context = await buildTenantContext(tenantId);
     const systemPrompt = buildSystemPrompt(tenant.name, tenant.businessType, context);
 
-    // Call LLM with context + history
-    const result = await callLLM(systemPrompt, message, history);
+    // Call LLM with context + history (tenant.name para desglosar el gasto de IA en Logan OS)
+    const result = await callLLM(systemPrompt, message, history, tenant.name);
 
     // ─── Case 2: LLM returned an action ───
     const action = parseAction(result.text);
