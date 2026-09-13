@@ -227,7 +227,7 @@ router.post('/tenants', async (req: Request, res: Response, next: NextFunction) 
         username: result.adminUser.username,
         name: result.adminUser.name,
       },
-      accessUrl: `https://${slug}.logancorp.mx`,
+      accessUrl: `https://${slug}.loganos.com`,
     });
   } catch (error) {
     next(error);
@@ -402,7 +402,7 @@ router.get('/onboarding/check-slug/:slug', async (req: Request, res: Response, n
     res.json({
       available: !existing,
       slug,
-      suggestedUrl: `https://${slug}.logancorp.mx`,
+      suggestedUrl: `https://${slug}.loganos.com`,
     });
   } catch (error) {
     next(error);

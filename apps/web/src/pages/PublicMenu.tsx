@@ -272,7 +272,7 @@ export default function PublicMenu() {
         <p className="text-gray-700 text-xs mt-2">Precios en MXN · Sujetos a cambio sin previo aviso</p>
         <p className="text-gray-700 text-xs mt-1">Algunos platillos pueden contener alérgenos. Consulta con tu mesero.</p>
         <a
-          href="https://logancorp.vercel.app"
+          href="https://www.loganos.com"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-700 hover:text-gray-500 text-[10px] mt-4 inline-block transition-colors"

@@ -138,7 +138,7 @@ export default function Login() {
         {/* Logan watermark */}
         <div className="mt-8 text-center">
           <a
-            href="https://logancorp.vercel.app"
+            href="https://www.loganos.com"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-400 text-xs transition-colors"

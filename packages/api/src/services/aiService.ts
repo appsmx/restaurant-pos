@@ -37,7 +37,7 @@ interface AskResult {
 
 // ─── LLM Call ────────────────────────────────────────────────────────────────
 
-const LOGAN_LLM_URL = process.env.LOGAN_LLM_URL || 'https://logancorp.vercel.app/api/llm';
+const LOGAN_LLM_URL = process.env.LOGAN_LLM_URL || 'https://www.loganos.com/api/llm';
 const LOGAN_LLM_SECRET = process.env.LOGAN_LLM_SECRET || '';
 
 async function callLLM(systemPrompt: string, userMessage: string, history?: { role: string; content: string }[], tenantName?: string): Promise<{ text: string; provider: string }> {

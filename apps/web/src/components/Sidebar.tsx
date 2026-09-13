@@ -43,7 +43,7 @@ export default function Sidebar({ activeView, onViewChange, navItems }: SidebarP
       <div className="mt-auto flex flex-col items-center gap-2">
         {/* Logan watermark */}
         <a
-          href="https://logancorp.vercel.app"
+          href="https://www.loganos.com"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-600 hover:text-gray-400 text-[9px] text-center transition-colors mb-2"
