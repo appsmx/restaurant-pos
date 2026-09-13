@@ -42,7 +42,11 @@ app.use(express.json());
 
 // Health check endpoint (Render lo usa para verificar que el servicio está vivo)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || 'unknown',
+  });
 });
 
 // General rate limit on all API routes (brute-force / abuse protection)
